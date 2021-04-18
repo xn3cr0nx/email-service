@@ -1,23 +1,29 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"os"
+	"os/signal"
 	"strings"
 	"time"
 
+	"github.com/hibiken/asynq"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"github.com/xn3cr0nx/email-service/internal/mailer/postmark"
 	"github.com/xn3cr0nx/email-service/internal/server"
+	"github.com/xn3cr0nx/email-service/internal/task"
 	"github.com/xn3cr0nx/email-service/internal/template"
 	"github.com/xn3cr0nx/email-service/pkg/logger"
+	"golang.org/x/sys/unix"
 )
 
 var (
-	port        int
-	debug, rest bool
-	target      string
+	port, db                       int
+	debug, rest, kafka             bool
+	templateDir, address, password string
 )
 
 var rootCmd = &cobra.Command{
@@ -46,22 +52,31 @@ func init() {
 	rootCmd.PersistentFlags().BoolVar(&debug, "debug", false, "Sets logging level to Debug")
 	rootCmd.Flags().IntVar(&port, "port", 6066, "Bind http server to port")
 	rootCmd.PersistentFlags().BoolVar(&rest, "rest", false, "Enable exposed REST API to interact with the service")
-	rootCmd.PersistentFlags().StringVar(&target, "target", "", "Sets if mailer should run once with a specific target")
+	rootCmd.PersistentFlags().StringVar(&templateDir, "template_dir", "templates/", "Define templates folder path")
+	rootCmd.PersistentFlags().BoolVar(&kafka, "kafka", false, "Set broken mode using kafka")
+	rootCmd.PersistentFlags().StringVar(&address, "address", "localhost:6379", "Set host address for used backend")
+	rootCmd.PersistentFlags().StringVar(&password, "password", "", "Set password for used backend")
+	rootCmd.PersistentFlags().IntVar(&db, "db", 2, "Set redis database number")
 }
 
 // initConfig reads in config file and ENV variables if set.
 func initConfig() {
 	viper.SetDefault("debug", false)
 	viper.BindPFlag("debug", rootCmd.PersistentFlags().Lookup("debug"))
-
 	viper.SetDefault("rest", false)
 	viper.BindPFlag("rest", rootCmd.PersistentFlags().Lookup("rest"))
-
 	viper.SetDefault("port", 6066)
 	viper.BindPFlag("port", rootCmd.PersistentFlags().Lookup("port"))
-
-	viper.SetDefault("target", "")
-	viper.BindPFlag("target", rootCmd.PersistentFlags().Lookup("target"))
+	viper.SetDefault("template_dir", "templates/")
+	viper.BindPFlag("template_dir", rootCmd.PersistentFlags().Lookup("template_dir"))
+	viper.SetDefault("kafka", false)
+	viper.BindPFlag("kafka", rootCmd.PersistentFlags().Lookup("kafka"))
+	viper.SetDefault("address", "localhost:6379")
+	viper.BindPFlag("address", rootCmd.PersistentFlags().Lookup("address"))
+	viper.SetDefault("password", "")
+	viper.BindPFlag("password", rootCmd.PersistentFlags().Lookup("password"))
+	viper.SetDefault("db", 2)
+	viper.BindPFlag("db", rootCmd.PersistentFlags().Lookup("db"))
 
 	viper.SetEnvPrefix("mailer")
 	viper.AutomaticEnv()
@@ -86,6 +101,11 @@ func initConfig() {
 func run(cmd *cobra.Command, args []string) {
 	logger.Info("Email Service", "Starting", logger.Params{"timestamp": time.Now()})
 
+	if err := validateConfig(); err != nil {
+		logger.Error("Email Service", fmt.Errorf("Configuration error: %w", err), logger.Params{})
+		os.Exit(-1)
+	}
+
 	// initialize template cache
 	templateDir := viper.GetString("template_dir")
 	if templateDir == "" {
@@ -93,13 +113,83 @@ func run(cmd *cobra.Command, args []string) {
 	}
 	_, err := template.NewTemplateCache(&templateDir)
 	if err != nil {
-		panic(fmt.Errorf("Cannot initialize template cache: %w", err))
+		logger.Error("Email Service", fmt.Errorf("Cannot initialize template cache: %w", err), logger.Params{})
+		os.Exit(-1)
 	}
 
 	mailer := postmark.NewClient(viper.GetString("postmark.server"), viper.GetString("postmark.account"))
 
-	if viper.GetBool("server.enabled") || viper.GetBool("rest") {
-		s := server.NewServer(viper.GetInt("server.port"), mailer)
-		s.Listen()
+	if viper.GetBool("rest") {
+		s := server.NewServer(viper.GetInt("port"), mailer)
+		go s.Listen()
 	}
+
+	if viper.GetBool("kafka") {
+		// TODO: dispatch Kafka consumer
+
+	} else {
+		server := asynq.NewServer(
+			asynq.RedisClientOpt{
+				Addr:     viper.GetString("address"),
+				Password: viper.GetString("password"),
+				DB:       viper.GetInt("db"),
+			},
+			asynq.Config{
+				Concurrency: viper.GetInt("queue.concurrency"),
+			})
+		mux := asynq.NewServeMux()
+
+		// Define custom middleware to log processing time and inject mailer into task context
+		mux.Use(func(h asynq.Handler) asynq.Handler {
+			return asynq.HandlerFunc(func(ctx context.Context, t *asynq.Task) error {
+				start := time.Now()
+				logger.Info("Email Service Queue", fmt.Sprintf("Start processing"), logger.Params{"type": t.Type})
+				enhancedContext := context.WithValue(ctx, "mailer", mailer)
+				if err := h.ProcessTask(enhancedContext, t); err != nil {
+					return err
+				}
+				logger.Info("Email Service Queue", fmt.Sprintf("Finished processing. Elapsed Time = %v", time.Since(start)), logger.Params{"type": t.Type})
+				return nil
+			})
+		})
+		mux.HandleFunc(template.WelcomeEmail, task.HandleWelcomeEmailTask)
+
+		if err := server.Run(mux); err != nil {
+			logger.Error("Email Service", fmt.Errorf("Cannot start queue server %v", err), logger.Params{})
+		}
+
+		sigs := make(chan os.Signal, 1)
+		signal.Notify(sigs, unix.SIGTERM, unix.SIGINT)
+		<-sigs // wait for termination signal
+		server.Stop()
+	}
+}
+
+var (
+	errMissingPort            = errors.New("missing server port")
+	errMissingRedisAddress    = errors.New("missing redis address")
+	errRedisDbOutOfRange      = errors.New("redis db out of range. allowed range 0-15")
+	errQueueConcurrencyNotSet = errors.New("queue concurrent workers number not defined. min 1")
+)
+
+func validateConfig() error {
+	if viper.GetBool("rest") {
+		if viper.GetInt("port") == 0 {
+			return errMissingPort
+		}
+	}
+
+	if !viper.GetBool("kafka") {
+		if viper.GetString("address") == "" {
+			return errMissingRedisAddress
+		}
+		if viper.GetInt("db") > 15 {
+			return errRedisDbOutOfRange
+		}
+		if viper.GetInt("concurrency") == 0 {
+			return errQueueConcurrencyNotSet
+		}
+	}
+
+	return nil
 }
