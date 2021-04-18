@@ -9,6 +9,7 @@ require (
 	github.com/go-openapi/spec v0.20.3 // indirect
 	github.com/go-openapi/swag v0.19.15 // indirect
 	github.com/go-playground/validator/v10 v10.5.0
+	github.com/keighl/postmark v0.0.0-20190821160221-28358b1a94e3 // indirect
 	github.com/labstack/echo/v4 v4.2.2
 	github.com/labstack/gommon v0.3.0
 	github.com/mailru/easyjson v0.7.7 // indirect

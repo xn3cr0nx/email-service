@@ -18,6 +18,7 @@ import (
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/spf13/viper"
 	echoSwagger "github.com/swaggo/echo-swagger"
+	"github.com/xn3cr0nx/email-service/internal/mailer"
 	"github.com/xn3cr0nx/email-service/pkg/pprof"
 	"github.com/xn3cr0nx/email-service/pkg/validator"
 )
@@ -27,6 +28,7 @@ type (
 	Server struct {
 		port   string
 		router *echo.Echo
+		mailer mailer.Service
 	}
 )
 
@@ -37,13 +39,14 @@ const (
 var server *Server
 
 // NewServer singleton pattern that returns pointer to server
-func NewServer(port int) *Server {
+func NewServer(port int, m mailer.Service) *Server {
 	if server != nil {
 		return server
 	}
 	server = &Server{
 		port:   fmt.Sprintf(":%d", port),
 		router: echo.New(),
+		mailer: m,
 	}
 	return server
 }

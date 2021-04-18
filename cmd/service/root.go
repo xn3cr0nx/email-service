@@ -8,7 +8,9 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"github.com/xn3cr0nx/email-service/internal/mailer/postmark"
 	"github.com/xn3cr0nx/email-service/internal/server"
+	"github.com/xn3cr0nx/email-service/internal/template"
 	"github.com/xn3cr0nx/email-service/pkg/logger"
 )
 
@@ -84,8 +86,20 @@ func initConfig() {
 func run(cmd *cobra.Command, args []string) {
 	logger.Info("Email Service", "Starting", logger.Params{"timestamp": time.Now()})
 
+	// initialize template cache
+	templateDir := viper.GetString("template_dir")
+	if templateDir == "" {
+		templateDir = "templates/"
+	}
+	_, err := template.NewTemplateCache(&templateDir)
+	if err != nil {
+		panic(fmt.Errorf("Cannot initialize template cache: %w", err))
+	}
+
+	mailer := postmark.NewClient(viper.GetString("postmark.server"), viper.GetString("postmark.account"))
+
 	if viper.GetBool("server.enabled") || viper.GetBool("rest") {
-		s := server.NewServer(viper.GetInt("server.port"))
+		s := server.NewServer(viper.GetInt("server.port"), mailer)
 		s.Listen()
 	}
 }
