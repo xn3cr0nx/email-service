@@ -1,0 +1,28 @@
+{
+    "swagger": "2.0",
+    "info": {
+        "description": "Email Service API swagger documentation.",
+        "title": "Email Service API",
+        "termsOfService": "http://swagger.io/terms/",
+        "contact": {
+            "name": "Patrick Jusic",
+            "url": "http://patrickjusic.com",
+            "email": "patrick.jusic@protonmail.com"
+        },
+        "license": {
+            "name": "Apache 2.0",
+            "url": "http://www.apache.org/licenses/LICENSE-2.0.html"
+        },
+        "version": "1.0"
+    },
+    "host": "localhost:3001",
+    "basePath": "/api",
+    "paths": {},
+    "securityDefinitions": {
+        "ApiKeyAuth": {
+            "type": "apiKey",
+            "name": "Authorization",
+            "in": "header"
+        }
+    }
+}

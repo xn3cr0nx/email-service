@@ -1,0 +1,21 @@
+basePath: /api
+host: localhost:3001
+info:
+  contact:
+    email: patrick.jusic@protonmail.com
+    name: Patrick Jusic
+    url: http://patrickjusic.com
+  description: Email Service API swagger documentation.
+  license:
+    name: Apache 2.0
+    url: http://www.apache.org/licenses/LICENSE-2.0.html
+  termsOfService: http://swagger.io/terms/
+  title: Email Service API
+  version: "1.0"
+paths: {}
+securityDefinitions:
+  ApiKeyAuth:
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

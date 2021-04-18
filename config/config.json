@@ -1,0 +1,6 @@
+{
+  "server": {
+    "enabled": true,
+    "port": 6066
+  }
+}
