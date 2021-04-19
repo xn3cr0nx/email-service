@@ -17,12 +17,14 @@ require (
 	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/onsi/ginkgo v1.16.1
 	github.com/onsi/gomega v1.11.0
+	github.com/satori/go.uuid v1.2.0 // indirect
 	github.com/sirupsen/logrus v1.8.1
 	github.com/spf13/cobra v1.1.3
 	github.com/spf13/viper v1.7.1
 	github.com/stretchr/testify v1.7.0
 	github.com/swaggo/echo-swagger v1.0.0
-	github.com/swaggo/swag v1.6.7
+	github.com/swaggo/http-swagger v1.0.0 // indirect
+	github.com/swaggo/swag v1.7.0
 	go.opentelemetry.io/contrib/instrumentation/github.com/labstack/echo/otelecho v0.19.0
 	go.opentelemetry.io/otel v0.19.0
 	go.opentelemetry.io/otel/exporters/metric/prometheus v0.19.0
