@@ -1,0 +1,43 @@
+# This docker-compose jsut exists for testing purpose in a development environment
+version: "3.8"
+
+x-network: &network
+  networks:
+    - service
+
+services:
+  redis:
+    image: redis:4
+    container_name: *redis-host
+    ports:
+      - 6379:6379
+    volumes:
+      - redis:/redis-data/data
+    <<: *network
+
+  service:
+    container_name: service
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+    ports:
+      - 6066:6066
+    <<: [*depends, *network]
+
+  docs:
+    container_name: docs
+    build:
+      context: .
+      dockerfile: ./docs.Dockerfile
+      args:
+        <<: *git-args
+    ports:
+      - 8085:8085
+    <<: *network
+ 
+volumes:
+  redis:
+    
+
+networks:
+  service:
