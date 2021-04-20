@@ -1,6 +1,7 @@
 package template
 
 import (
+	"io/fs"
 	"os"
 	"path/filepath"
 
@@ -18,9 +19,9 @@ func NewTemplateCache(templateDir *string) (*TemplateCache, error) {
 	if cache != nil {
 		return cache, nil
 	}
-	cache := &TemplateCache{Dir: *templateDir}
+	cache = &TemplateCache{Dir: *templateDir}
 	cache.Cache = make(map[string][]byte)
-	addToCache := func(path string, f os.FileInfo, err error) error {
+	addToCache := func(path string, f fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -29,7 +30,7 @@ func NewTemplateCache(templateDir *string) (*TemplateCache, error) {
 			return nil
 		}
 
-		if f.Mode().IsRegular() {
+		if f.Type().IsRegular() {
 			b, err := os.ReadFile(path)
 			if err != nil {
 				return err
@@ -38,11 +39,12 @@ func NewTemplateCache(templateDir *string) (*TemplateCache, error) {
 		}
 		return nil
 	}
-	if err := filepath.Walk(*templateDir, addToCache); err != nil {
+	if err := filepath.WalkDir(*templateDir, addToCache); err != nil {
 		logger.Error("Cache", err, logger.Params{"template dir": templateDir})
-		return cache, err
+		return nil, err
 	}
 
+	logger.Info("Cache", "Initialized", logger.Params{"templates": len(cache.Cache), "base_dir": cache.Dir})
 	return cache, nil
 }
 

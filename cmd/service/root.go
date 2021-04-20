@@ -21,7 +21,7 @@ import (
 )
 
 var (
-	port, db                       int
+	port, db, concurrency          int
 	debug, rest, kafka             bool
 	templateDir, address, password string
 )
@@ -49,14 +49,15 @@ func init() {
 	cobra.OnInitialize(initConfig)
 
 	// Adds root flags and persistent flags
-	rootCmd.PersistentFlags().BoolVar(&debug, "debug", false, "Sets logging level to Debug")
-	rootCmd.Flags().IntVar(&port, "port", 6066, "Bind http server to port")
+	rootCmd.PersistentFlags().BoolVarP(&debug, "debug", "d", false, "Sets logging level to Debug")
+	rootCmd.PersistentFlags().IntVarP(&port, "port", "p", 6066, "Bind http server to port")
 	rootCmd.PersistentFlags().BoolVar(&rest, "rest", false, "Enable exposed REST API to interact with the service")
 	rootCmd.PersistentFlags().StringVar(&templateDir, "template_dir", "templates/", "Define templates folder path")
 	rootCmd.PersistentFlags().BoolVar(&kafka, "kafka", false, "Set broken mode using kafka")
 	rootCmd.PersistentFlags().StringVar(&address, "address", "localhost:6379", "Set host address for used backend")
 	rootCmd.PersistentFlags().StringVar(&password, "password", "", "Set password for used backend")
 	rootCmd.PersistentFlags().IntVar(&db, "db", 2, "Set redis database number")
+	rootCmd.PersistentFlags().IntVar(&concurrency, "concurrency", 10, "Set number of concurrent workers")
 }
 
 // initConfig reads in config file and ENV variables if set.
@@ -77,6 +78,8 @@ func initConfig() {
 	viper.BindPFlag("password", rootCmd.PersistentFlags().Lookup("password"))
 	viper.SetDefault("db", 2)
 	viper.BindPFlag("db", rootCmd.PersistentFlags().Lookup("db"))
+	viper.SetDefault("concurrency", 10)
+	viper.BindPFlag("concurrency", rootCmd.PersistentFlags().Lookup("concurrency"))
 
 	viper.SetEnvPrefix("mailer")
 	viper.AutomaticEnv()
@@ -135,24 +138,26 @@ func run(cmd *cobra.Command, args []string) {
 				DB:       viper.GetInt("db"),
 			},
 			asynq.Config{
-				Concurrency: viper.GetInt("queue.concurrency"),
+				Concurrency: viper.GetInt("concurrency"),
 			})
+
+		h := task.WelcomeEmailHandler{Mailer: mailer}
 		mux := asynq.NewServeMux()
 
-		// Define custom middleware to log processing time and inject mailer into task context
+		// Define custom middleware to log processing time and log catched error
 		mux.Use(func(h asynq.Handler) asynq.Handler {
 			return asynq.HandlerFunc(func(ctx context.Context, t *asynq.Task) error {
 				start := time.Now()
 				logger.Info("Email Service Queue", fmt.Sprintf("Start processing"), logger.Params{"type": t.Type})
-				enhancedContext := context.WithValue(ctx, "mailer", mailer)
-				if err := h.ProcessTask(enhancedContext, t); err != nil {
+				if err := h.ProcessTask(ctx, t); err != nil {
+					logger.Error("Email Service Queue", err, logger.Params{"type": t.Type})
 					return err
 				}
 				logger.Info("Email Service Queue", fmt.Sprintf("Finished processing. Elapsed Time = %v", time.Since(start)), logger.Params{"type": t.Type})
 				return nil
 			})
 		})
-		mux.HandleFunc(template.WelcomeEmail, task.HandleWelcomeEmailTask)
+		mux.Handle(template.WelcomeEmail, h)
 
 		if err := server.Run(mux); err != nil {
 			logger.Error("Email Service", fmt.Errorf("Cannot start queue server %v", err), logger.Params{})
