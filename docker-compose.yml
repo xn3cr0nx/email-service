@@ -17,12 +17,12 @@ services:
     volumes:
       - redis:/redis-data/data
     <<: *network
-    
+
   asynqmon:
     image: hibiken/asynqmon
     container_name: asynqmon
     command: asynqmon --redis_addr=redis:6379
-    environment: 
+    environment:
       - redis_addr=redis:6379
     ports:
       - 8080:8080
@@ -45,10 +45,31 @@ services:
     ports:
       - 8085:8085
     <<: *network
- 
+
+  # Kafka related services
+  zookeeper:
+    container_name: zookeeper
+    image: wurstmeister/zookeeper
+    ports:
+      - "2181:2181"
+    <<: *network
+      
+  kafka:
+    image: wurstmeister/kafka
+    container_name: kafka
+    ports:
+      - "9092:9092"
+    environment:
+      # KAFKA_ADVERTISED_HOST_NAME: 192.168.1.182
+      KAFKA_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_CREATE_TOPICS: "emails:4:1"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    <<: *network
+
 volumes:
   redis:
-    
 
 networks:
   service:

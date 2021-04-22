@@ -49,3 +49,7 @@ run: docs
 
 docker-server:
 	$(DC) $(DCUP) service
+
+kafka:
+# MY_IP=192.168.1.12 $(DC) $(DCUP) --remove-orphans zk1 zk2 zk3 kafka1 kafka2 kafka3
+	$(DC) $(DCUP) --remove-orphans zookeeper kafka
