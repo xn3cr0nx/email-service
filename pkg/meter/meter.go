@@ -1,12 +1,17 @@
 package meter
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 
-	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/metric/prometheus"
 	"go.opentelemetry.io/otel/metric"
+	"go.opentelemetry.io/otel/metric/global"
+)
+
+var (
+	errMissingName = errors.New("service name not provided")
 )
 
 var meter *metric.Meter
@@ -14,16 +19,21 @@ var meter *metric.Meter
 // Config tracer configuration
 type Config struct {
 	Name string
+	Port int
 }
 
 // NewMeter singleton implementation returns default meter
 func NewMeter(conf *Config) (*metric.Meter, error) {
 	if meter == nil {
+		if conf.Name == "" {
+			return nil, errMissingName
+		}
+
 		if err := configure(conf); err != nil {
 			return nil, err
 		}
 
-		m := otel.Meter(conf.Name)
+		m := global.Meter(conf.Name)
 		meter = &m
 	}
 	return meter, nil
@@ -36,9 +46,9 @@ func configure(conf *Config) (err error) {
 	}
 	http.HandleFunc("/", exporter.ServeHTTP)
 	go func() {
-		_ = http.ListenAndServe(":9464", nil)
+		_ = http.ListenAndServe(fmt.Sprintf(":%d", conf.Port), nil)
 	}()
 
-	fmt.Println("Prometheus server running on :9464")
+	fmt.Println(fmt.Sprintf("Prometheus server running on :%d", conf.Port))
 	return
 }

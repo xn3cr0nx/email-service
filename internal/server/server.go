@@ -11,6 +11,8 @@ import (
 	"time"
 
 	"github.com/labstack/gommon/log"
+	"go.opentelemetry.io/otel/metric"
+	"go.opentelemetry.io/otel/trace"
 
 	"github.com/etherlabsio/healthcheck"
 	v "github.com/go-playground/validator/v10"
@@ -20,6 +22,7 @@ import (
 	echoSwagger "github.com/swaggo/echo-swagger"
 	"github.com/xn3cr0nx/email-service/internal/mailer"
 	"github.com/xn3cr0nx/email-service/pkg/pprof"
+	"github.com/xn3cr0nx/email-service/pkg/tracer"
 	"github.com/xn3cr0nx/email-service/pkg/validator"
 )
 
@@ -29,6 +32,8 @@ type (
 		port   string
 		router *echo.Echo
 		mailer mailer.Service
+		tracer *trace.Tracer
+		meter  *metric.Meter
 	}
 )
 
@@ -39,7 +44,7 @@ const (
 var server *Server
 
 // NewServer singleton pattern that returns pointer to server
-func NewServer(port int, m mailer.Service) *Server {
+func NewServer(port int, m mailer.Service, tracer *trace.Tracer, meter *metric.Meter) *Server {
 	if server != nil {
 		return server
 	}
@@ -47,6 +52,8 @@ func NewServer(port int, m mailer.Service) *Server {
 		port:   fmt.Sprintf(":%d", port),
 		router: echo.New(),
 		mailer: m,
+		tracer: tracer,
+		meter:  meter,
 	}
 	return server
 }
@@ -76,6 +83,12 @@ func (s *Server) Listen() {
 	}))
 
 	s.router.Use(middleware.RequestID())
+
+	if s.tracer != nil {
+		// instrument echo with tracer middleware
+		mw := tracer.Middleware()
+		s.router.Use(mw)
+	}
 
 	s.router.GET("/swagger/*", echoSwagger.WrapHandler)
 	s.router.GET("/status", handleStatus())

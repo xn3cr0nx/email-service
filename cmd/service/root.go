@@ -18,14 +18,18 @@ import (
 	"github.com/xn3cr0nx/email-service/internal/task"
 	"github.com/xn3cr0nx/email-service/internal/template"
 	"github.com/xn3cr0nx/email-service/pkg/logger"
+	"github.com/xn3cr0nx/email-service/pkg/meter"
+	"github.com/xn3cr0nx/email-service/pkg/tracer"
+	"go.opentelemetry.io/otel/metric"
+	"go.opentelemetry.io/otel/trace"
 	"golang.org/x/sys/unix"
 )
 
 var (
-	port, db, concurrency                                  int
-	debug, rest, k                                         bool
-	templateDir, address, password, kafkaGroup, kafkaTopic string
-	kafkaAddress                                           []string
+	port, redisDb, concurrency, otel_exporter_jaeger_agent_port, otel_exporter_prometheus_port              int
+	debug, rest, k, otel_exporter_jaeger_enable, otel_exporter_prometheus_enable                            bool
+	name, templateDir, redisAddress, redisPassword, kafkaGroup, kafkaTopic, otel_exporter_jaeger_agent_host string
+	kafkaAddress                                                                                            []string
 )
 
 var rootCmd = &cobra.Command{
@@ -53,16 +57,22 @@ func init() {
 	// Adds root flags and persistent flags
 	rootCmd.PersistentFlags().BoolVarP(&debug, "debug", "d", false, "Sets logging level to Debug")
 	rootCmd.PersistentFlags().IntVarP(&port, "port", "p", 6066, "Bind http server to port")
+	rootCmd.PersistentFlags().StringVarP(&name, "name", "n", "Mailer", "Set service name")
 	rootCmd.PersistentFlags().BoolVar(&rest, "rest", false, "Enable exposed REST API to interact with the service")
 	rootCmd.PersistentFlags().StringVar(&templateDir, "template_dir", "templates/", "Define templates folder path")
-	rootCmd.PersistentFlags().BoolVar(&k, "kafka", false, "Set broken mode using kafka")
+	rootCmd.PersistentFlags().BoolVar(&k, "kafka", false, "Set kafka as broker backend")
 	rootCmd.PersistentFlags().StringArrayVar(&kafkaAddress, "kafka_address", []string{"localhost:9092"}, "Set kafka addresses")
 	rootCmd.PersistentFlags().StringVar(&kafkaGroup, "kafka_group", "my-group", "Set kafka group name")
 	rootCmd.PersistentFlags().StringVar(&kafkaTopic, "kafka_topic", "emails", "Set kafka partition name")
-	rootCmd.PersistentFlags().StringVar(&address, "address", "localhost:6379", "Set host address for used backend")
-	rootCmd.PersistentFlags().StringVar(&password, "password", "", "Set password for used backend")
-	rootCmd.PersistentFlags().IntVar(&db, "db", 2, "Set redis database number")
-	rootCmd.PersistentFlags().IntVar(&concurrency, "concurrency", 10, "Set number of concurrent workers")
+	rootCmd.PersistentFlags().StringVar(&redisAddress, "redis_address", "localhost:6379", "Set host address for redis backend")
+	rootCmd.PersistentFlags().StringVar(&redisPassword, "redis_password", "", "Set password for redis backend")
+	rootCmd.PersistentFlags().IntVar(&redisDb, "redis_db", 2, "Set redis database number")
+	rootCmd.PersistentFlags().IntVar(&concurrency, "concurrency", 10, "Set number of concurrent workers for redis backend")
+	rootCmd.PersistentFlags().BoolVar(&otel_exporter_jaeger_enable, "otel_exporter_jaeger_enable", false, "Enable OpenTelemetry based jager tracing")
+	rootCmd.PersistentFlags().StringVar(&otel_exporter_jaeger_agent_host, "otel_exporter_jaeger_agent_host", "jaeger", "Override Jaeger agent hostname")
+	rootCmd.PersistentFlags().IntVar(&otel_exporter_jaeger_agent_port, "otel_exporter_jaeger_agent_port", 14268, "Override Jaeger agent port")
+	rootCmd.PersistentFlags().BoolVar(&otel_exporter_prometheus_enable, "otel_exporter_prometheus_enable", false, "Enable OpenTelemetry based prometheus metrics")
+	rootCmd.PersistentFlags().IntVar(&otel_exporter_prometheus_port, "otel_exporter_prometheus_port", 14268, "Override Prometheus exposed port")
 }
 
 // initConfig reads in config file and ENV variables if set.
@@ -73,6 +83,8 @@ func initConfig() {
 	viper.BindPFlag("rest", rootCmd.PersistentFlags().Lookup("rest"))
 	viper.SetDefault("port", 6066)
 	viper.BindPFlag("port", rootCmd.PersistentFlags().Lookup("port"))
+	viper.SetDefault("name", "Mailer")
+	viper.BindPFlag("name", rootCmd.PersistentFlags().Lookup("name"))
 	viper.SetDefault("template_dir", "templates/")
 	viper.BindPFlag("template_dir", rootCmd.PersistentFlags().Lookup("template_dir"))
 	viper.SetDefault("kafka", false)
@@ -83,14 +95,24 @@ func initConfig() {
 	viper.BindPFlag("kafka_group", rootCmd.PersistentFlags().Lookup("kafka_group"))
 	viper.SetDefault("kafka_topic", "emails")
 	viper.BindPFlag("kafka_topic", rootCmd.PersistentFlags().Lookup("kafka_topic"))
-	viper.SetDefault("address", "localhost:6379")
-	viper.BindPFlag("address", rootCmd.PersistentFlags().Lookup("address"))
-	viper.SetDefault("password", "")
-	viper.BindPFlag("password", rootCmd.PersistentFlags().Lookup("password"))
-	viper.SetDefault("db", 2)
-	viper.BindPFlag("db", rootCmd.PersistentFlags().Lookup("db"))
+	viper.SetDefault("redis_address", "localhost:6379")
+	viper.BindPFlag("redis_address", rootCmd.PersistentFlags().Lookup("redis_address"))
+	viper.SetDefault("redis_password", "")
+	viper.BindPFlag("redis_password", rootCmd.PersistentFlags().Lookup("redis_password"))
+	viper.SetDefault("redis_db", 2)
+	viper.BindPFlag("redis_db", rootCmd.PersistentFlags().Lookup("redis_db"))
 	viper.SetDefault("concurrency", 10)
 	viper.BindPFlag("concurrency", rootCmd.PersistentFlags().Lookup("concurrency"))
+	viper.SetDefault("otel_exporter_jaeger_enable", false)
+	viper.BindPFlag("otel_exporter_jaeger_enable", rootCmd.PersistentFlags().Lookup("otel_exporter_jaeger_enable"))
+	viper.SetDefault("otel_exporter_jaeger_agent_host", "jaeger")
+	viper.BindPFlag("otel_exporter_jaeger_agent_host", rootCmd.PersistentFlags().Lookup("otel_exporter_jaeger_agent_host"))
+	viper.SetDefault("otel_exporter_jaeger_agent_port", 14268)
+	viper.BindPFlag("otel_exporter_jaeger_agent_port", rootCmd.PersistentFlags().Lookup("otel_exporter_jaeger_agent_port"))
+	viper.SetDefault("otel_exporter_prometheus_enable", false)
+	viper.BindPFlag("otel_exporter_prometheus_enable", rootCmd.PersistentFlags().Lookup("otel_exporter_prometheus_enable"))
+	viper.SetDefault("otel_exporter_prometheus_port", 9464)
+	viper.BindPFlag("otel_exporter_prometheus_port", rootCmd.PersistentFlags().Lookup("otel_exporter_prometheus_port"))
 
 	viper.SetEnvPrefix("mailer")
 	viper.AutomaticEnv()
@@ -120,6 +142,33 @@ func run(cmd *cobra.Command, args []string) {
 		os.Exit(-1)
 	}
 
+	ctx := context.Background()
+
+	var tr *trace.Tracer
+	if viper.GetBool("otel_exporter_jaeger_enable") {
+		var err error
+		tr, err = tracer.NewTracer(&tracer.Config{
+			Name:     viper.GetString("name"),
+			Host:     viper.GetString("otel_exporter_jaeger_agent_host"),
+			Port:     viper.GetInt("otel_exporter_jaeger_agent_port"),
+			Exporter: tracer.Jaeger,
+		})
+		if err != nil {
+			logger.Error("Email Service", fmt.Errorf("Cannot initialize tracer: %w", err), logger.Params{})
+			os.Exit(-1)
+		}
+	}
+
+	var mt *metric.Meter
+	if viper.GetBool("otel_exporter_prometheus_enable") {
+		var err error
+		mt, err = meter.NewMeter(&meter.Config{Name: viper.GetString("name"), Port: viper.GetInt("otel_exporter_prometheus_port")})
+		if err != nil {
+			logger.Error("Email Service", fmt.Errorf("Cannot initialize tracer: %w", err), logger.Params{})
+			os.Exit(-1)
+		}
+	}
+
 	// initialize template cache
 	templateDir := viper.GetString("template_dir")
 	if templateDir == "" {
@@ -134,7 +183,7 @@ func run(cmd *cobra.Command, args []string) {
 	mailer := postmark.NewClient(viper.GetString("postmark.server"), viper.GetString("postmark.account"))
 
 	if viper.GetBool("rest") {
-		s := server.NewServer(viper.GetInt("port"), mailer)
+		s := server.NewServer(viper.GetInt("port"), mailer, tr, mt)
 		go s.Listen()
 	}
 
@@ -150,9 +199,9 @@ func run(cmd *cobra.Command, args []string) {
 			GroupID:     viper.GetString("kafka_group"),
 			Logger:      logger.Log,
 		})
-		consumer := task.NewKafkaEmailConsumer(r, mailer)
+		consumer := task.NewKafkaEmailConsumer(r, mailer, tr, mt)
 		// blocking consumer reading messages
-		consumer.Run(context.Background())
+		consumer.Run(ctx)
 
 	} else {
 		server := asynq.NewServer(
@@ -165,7 +214,7 @@ func run(cmd *cobra.Command, args []string) {
 				Concurrency: viper.GetInt("concurrency"),
 			})
 
-		h := task.NewEmailHandler(mailer)
+		h := task.NewEmailHandler(mailer, tr, mt)
 		if err := server.Run(h); err != nil {
 			logger.Error("Email Service", fmt.Errorf("Cannot start queue server %v", err), logger.Params{})
 		}

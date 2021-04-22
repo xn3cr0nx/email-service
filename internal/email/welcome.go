@@ -1,6 +1,7 @@
 package email
 
 import (
+	"context"
 	"fmt"
 	"net/url"
 
@@ -41,7 +42,7 @@ func (b *WelcomeEmailBody) ValidateBody() error {
 	return nil
 }
 
-func (b *WelcomeEmailBody) Process(m mailer.Service) error {
+func (b *WelcomeEmailBody) Process(ctx context.Context, m mailer.Service) error {
 	if err := b.ValidateBody(); err != nil {
 		return err
 	}
