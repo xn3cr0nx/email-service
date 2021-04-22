@@ -27,3 +27,6 @@
 
 /config/*
 /templates/*
+
+swagger.json
+swagger.yaml

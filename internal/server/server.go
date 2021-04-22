@@ -20,6 +20,7 @@ import (
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/spf13/viper"
 	echoSwagger "github.com/swaggo/echo-swagger"
+	"github.com/xn3cr0nx/email-service/internal/email"
 	"github.com/xn3cr0nx/email-service/internal/mailer"
 	"github.com/xn3cr0nx/email-service/pkg/pprof"
 	"github.com/xn3cr0nx/email-service/pkg/tracer"
@@ -92,6 +93,9 @@ func (s *Server) Listen() {
 
 	s.router.GET("/swagger/*", echoSwagger.WrapHandler)
 	s.router.GET("/status", handleStatus())
+
+	emailService := email.NewService(s.mailer, s.tracer, s.meter)
+	s.router.POST("/email", email.Handler(emailService))
 
 	log.Printf(
 		"mailer (PID: %d) is starting on %s\n=> Ctrl-C to shutdown server\n",
