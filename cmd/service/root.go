@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/hibiken/asynq"
+	"github.com/segmentio/kafka-go"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"github.com/xn3cr0nx/email-service/internal/mailer/postmark"
@@ -21,9 +22,10 @@ import (
 )
 
 var (
-	port, db, concurrency          int
-	debug, rest, kafka             bool
-	templateDir, address, password string
+	port, db, concurrency                                  int
+	debug, rest, k                                         bool
+	templateDir, address, password, kafkaGroup, kafkaTopic string
+	kafkaAddress                                           []string
 )
 
 var rootCmd = &cobra.Command{
@@ -53,7 +55,10 @@ func init() {
 	rootCmd.PersistentFlags().IntVarP(&port, "port", "p", 6066, "Bind http server to port")
 	rootCmd.PersistentFlags().BoolVar(&rest, "rest", false, "Enable exposed REST API to interact with the service")
 	rootCmd.PersistentFlags().StringVar(&templateDir, "template_dir", "templates/", "Define templates folder path")
-	rootCmd.PersistentFlags().BoolVar(&kafka, "kafka", false, "Set broken mode using kafka")
+	rootCmd.PersistentFlags().BoolVar(&k, "kafka", false, "Set broken mode using kafka")
+	rootCmd.PersistentFlags().StringArrayVar(&kafkaAddress, "kafka_address", []string{"localhost:9092"}, "Set kafka addresses")
+	rootCmd.PersistentFlags().StringVar(&kafkaGroup, "kafka_group", "my-group", "Set kafka group name")
+	rootCmd.PersistentFlags().StringVar(&kafkaTopic, "kafka_topic", "emails", "Set kafka partition name")
 	rootCmd.PersistentFlags().StringVar(&address, "address", "localhost:6379", "Set host address for used backend")
 	rootCmd.PersistentFlags().StringVar(&password, "password", "", "Set password for used backend")
 	rootCmd.PersistentFlags().IntVar(&db, "db", 2, "Set redis database number")
@@ -72,6 +77,12 @@ func initConfig() {
 	viper.BindPFlag("template_dir", rootCmd.PersistentFlags().Lookup("template_dir"))
 	viper.SetDefault("kafka", false)
 	viper.BindPFlag("kafka", rootCmd.PersistentFlags().Lookup("kafka"))
+	viper.SetDefault("kafka_address", []string{"localhost:9092"})
+	viper.BindPFlag("kafka_address", rootCmd.PersistentFlags().Lookup("kafka_address"))
+	viper.SetDefault("kafka_group", "my-group")
+	viper.BindPFlag("kafka_group", rootCmd.PersistentFlags().Lookup("kafka_group"))
+	viper.SetDefault("kafka_topic", "emails")
+	viper.BindPFlag("kafka_topic", rootCmd.PersistentFlags().Lookup("kafka_topic"))
 	viper.SetDefault("address", "localhost:6379")
 	viper.BindPFlag("address", rootCmd.PersistentFlags().Lookup("address"))
 	viper.SetDefault("password", "")
@@ -128,7 +139,20 @@ func run(cmd *cobra.Command, args []string) {
 	}
 
 	if viper.GetBool("kafka") {
-		// TODO: dispatch Kafka consumer
+		// initialize a new reader with the brokers and topic
+		// the groupID identifies the consumer and prevents
+		// it from receiving duplicate messages
+		r := kafka.NewReader(kafka.ReaderConfig{
+			// Brokers:     []string{"localhost:19092", "localhost:29092", "localhost:39092"},
+			Brokers:     viper.GetStringSlice("kafka_address"),
+			Topic:       viper.GetString("kafka_topic"),
+			StartOffset: kafka.FirstOffset,
+			GroupID:     viper.GetString("kafka_group"),
+			Logger:      logger.Log,
+		})
+		consumer := task.NewKafkaEmailConsumer(r, mailer)
+		// blocking consumer reading messages
+		consumer.Run(context.Background())
 
 	} else {
 		server := asynq.NewServer(
@@ -141,25 +165,8 @@ func run(cmd *cobra.Command, args []string) {
 				Concurrency: viper.GetInt("concurrency"),
 			})
 
-		h := task.WelcomeEmailHandler{Mailer: mailer}
-		mux := asynq.NewServeMux()
-
-		// Define custom middleware to log processing time and log catched error
-		mux.Use(func(h asynq.Handler) asynq.Handler {
-			return asynq.HandlerFunc(func(ctx context.Context, t *asynq.Task) error {
-				start := time.Now()
-				logger.Info("Email Service Queue", fmt.Sprintf("Start processing"), logger.Params{"type": t.Type})
-				if err := h.ProcessTask(ctx, t); err != nil {
-					logger.Error("Email Service Queue", err, logger.Params{"type": t.Type})
-					return err
-				}
-				logger.Info("Email Service Queue", fmt.Sprintf("Finished processing. Elapsed Time = %v", time.Since(start)), logger.Params{"type": t.Type})
-				return nil
-			})
-		})
-		mux.Handle(template.WelcomeEmail, h)
-
-		if err := server.Run(mux); err != nil {
+		h := task.NewEmailHandler(mailer)
+		if err := server.Run(h); err != nil {
 			logger.Error("Email Service", fmt.Errorf("Cannot start queue server %v", err), logger.Params{})
 		}
 

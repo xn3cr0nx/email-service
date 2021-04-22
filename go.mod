@@ -18,6 +18,7 @@ require (
 	github.com/onsi/ginkgo v1.16.1
 	github.com/onsi/gomega v1.11.0
 	github.com/satori/go.uuid v1.2.0 // indirect
+	github.com/segmentio/kafka-go v0.4.14 // indirect
 	github.com/sirupsen/logrus v1.8.1
 	github.com/spf13/cobra v1.1.3
 	github.com/spf13/viper v1.7.1
