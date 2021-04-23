@@ -5,12 +5,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/segmentio/kafka-go"
 	"github.com/xn3cr0nx/email-service/internal/email"
 	"github.com/xn3cr0nx/email-service/internal/mailer"
 	"github.com/xn3cr0nx/email-service/internal/template"
 	"github.com/xn3cr0nx/email-service/pkg/logger"
+	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
 	"go.opentelemetry.io/otel/trace"
 )
@@ -36,21 +38,35 @@ func (k *KafkaEmailConsumer) Run(ctx context.Context) {
 		welcomeEmailCounter = metric.Must(*k.meter).NewInt64Counter("kafka.emails.welcome")
 	}
 
+	var spanContext context.Context
+	var span trace.Span
+	if k.tracer != nil {
+		spanContext, span = (*k.tracer).Start(ctx, "email")
+		defer span.End()
+	} else {
+		spanContext = context.WithValue(ctx, "email", "")
+	}
+
+	// TODO: consider if adding unique UUID to message keys
+
 	for {
-		// the `ReadMessage` method blocks until we receive the next event
-		msg, err := k.Reader.ReadMessage(ctx)
+		// the `FetchMessage` method blocks until we receive the next event, and the message needs to
+		// be commited in order to update offset
+		msg, err := k.Reader.FetchMessage(spanContext)
 		if err != nil {
 			logger.Error("Email Service Kafka", fmt.Errorf("Could not read message: %v", err), logger.Params{})
 			continue
 		}
 		logger.Info("Email Service Kafka", fmt.Sprintf("Received: %s", string(msg.Value)), logger.Params{})
 
-		// var span trace.Span
-		// if k.tracer != nil {
-		// 	_, span = (*k.tracer).Start(ctx, "email")
-		// 	span.SetAttributes(attribute.Key(msg.Key).String(string(msg.Value)))
-		// 	defer span.End()
-		// }
+		var emailSpanContext context.Context
+		var emailSpan trace.Span
+		if k.tracer != nil {
+			emailSpanContext, emailSpan = (*k.tracer).Start(spanContext, string(msg.Key))
+			emailSpan.SetAttributes(attribute.Key(msg.Key).String(string(msg.Value)))
+		} else {
+			emailSpanContext = context.WithValue(spanContext, string(msg.Key), string(msg.Value))
+		}
 
 		switch string(msg.Key) {
 		case template.WelcomeEmail:
@@ -60,20 +76,31 @@ func (k *KafkaEmailConsumer) Run(ctx context.Context) {
 				continue
 			}
 
-			if err = emailTask.Process(ctx, k.Mailer); err != nil {
+			if err = emailTask.Process(emailSpanContext, k.Mailer); err != nil {
 				logger.Error("Email Service Kafka", fmt.Errorf("Could not process message: %v", err), logger.Params{})
 				continue
 			}
 			if k.meter != nil {
 				(*welcomeEmailCounterLock).Lock()
-				welcomeEmailCounter.Add(ctx, 1)
+				welcomeEmailCounter.Add(emailSpanContext, 1)
 				(*welcomeEmailCounterLock).Unlock()
 			}
 		}
 		if k.meter != nil {
 			(*emailCounterLock).Lock()
-			emailCounter.Add(ctx, 1)
+			emailCounter.Add(emailSpanContext, 1)
 			(*emailCounterLock).Unlock()
+		}
+
+		if err := k.Reader.CommitMessages(emailSpanContext, msg); err != nil {
+			logger.Error("Email Service Kafka", fmt.Errorf("Could not commit message: %v. Retrying...", err), logger.Params{"message": string(msg.Value)})
+			time.Sleep(2 * time.Second)
+			if err := k.Reader.CommitMessages(emailSpanContext, msg); err != nil {
+				logger.Error("Email Service Kafka", fmt.Errorf("Could not commit message second time: %v", err), logger.Params{"message": string(msg.Value)})
+				if k.tracer != nil {
+					emailSpan.AddEvent("Could not commit message", trace.WithAttributes(attribute.Int("timestamp", int(time.Now().Unix()))))
+				}
+			}
 		}
 	}
 }
