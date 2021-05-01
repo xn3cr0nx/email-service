@@ -39,9 +39,6 @@ func main() {
 			return
 		}
 		t := asynq.NewTask(template.WelcomeEmail, payload)
-		if err != nil {
-			log.Fatalf("could not enqueue task: %v", err)
-		}
 		res, err := c.Enqueue(t)
 		if err != nil {
 			log.Fatalf("could not enqueue task: %v", err)

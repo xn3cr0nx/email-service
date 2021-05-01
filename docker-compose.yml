@@ -1,4 +1,4 @@
-# This docker-compose jsut exists for testing purpose in a development environment
+# This docker-compose just exists for testing purpose in a development environment
 version: "3.8"
 
 x-env: &env ${ENV:-development}
