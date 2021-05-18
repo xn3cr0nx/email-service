@@ -25,5 +25,6 @@ FROM golang:alpine
 
 WORKDIR /root/
 COPY --from=builder /service/bin/service .
+COPY --from=builder /service/templates/ ./templates/
 
 CMD ./service
