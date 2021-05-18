@@ -26,6 +26,4 @@ FROM golang:alpine
 WORKDIR /root/
 COPY --from=builder /service/bin/service .
 
-EXPOSE 8080
-
-CMD ./service -debug=true
+CMD ./service

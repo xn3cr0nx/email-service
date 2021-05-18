@@ -9,7 +9,10 @@ RUN go mod download
 
 COPY . .
 
-RUN CGO_ENABLED=0 GOOS=linux go build -o ./bin/docs -tags docs ./cmd/docs
+RUN go get -u github.com/swaggo/swag/cmd/swag@v1.6.7
+RUN swag init -g cmd/api/main.go
+
+RUN CGO_ENABLED=0 GOOS=linux go build -mod=mod -o ./bin/docs -tags docs ./cmd/docs
 
 ################################################################################
 # Final image
