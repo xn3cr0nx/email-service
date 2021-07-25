@@ -34,11 +34,7 @@ func main() {
 		if err != nil {
 			return
 		}
-		var payload map[string]interface{}
-		if err := json.Unmarshal(bytes, &payload); err != nil {
-			return
-		}
-		t := asynq.NewTask(template.WelcomeEmail, payload)
+		t := asynq.NewTask(template.WelcomeEmail, bytes)
 		res, err := c.Enqueue(t)
 		if err != nil {
 			log.Fatalf("could not enqueue task: %v", err)

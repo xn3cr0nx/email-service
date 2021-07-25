@@ -3,6 +3,7 @@ package task
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -47,15 +48,10 @@ func (h EmailHandler) ProcessTask(ctx context.Context, t *asynq.Task) (err error
 		logger.Info("Email Service Queue", fmt.Sprintf("Finished processing. Elapsed Time = %v", time.Since(start)), logger.Params{"type": t.Type})
 	})()
 
-	switch t.Type {
+	switch t.Type() {
 	case template.WelcomeEmail:
-		bytes, e := t.Payload.MarshalJSON()
-		if e != nil {
-			logger.Error("Email Service Queue", err, logger.Params{"type": t.Type})
-			return e
-		}
 		var emailTask email.WelcomeEmailBody
-		if err = json.Unmarshal(bytes, &emailTask); err != nil {
+		if err = json.Unmarshal(t.Payload(), &emailTask); err != nil {
 			logger.Error("Email Service Queue", err, logger.Params{"type": t.Type})
 			return
 		}
@@ -69,6 +65,8 @@ func (h EmailHandler) ProcessTask(ctx context.Context, t *asynq.Task) (err error
 			h.welcomeEmailCounter.Add(ctx, 1)
 			(*h.welcomeEmailCounterLock).Unlock()
 		}
+	default:
+		return errors.New("unmatched case")
 	}
 	if h.meter != nil {
 		(*h.emailCounterLock).Lock()

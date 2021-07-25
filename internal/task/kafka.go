@@ -3,6 +3,7 @@ package task
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -85,6 +86,9 @@ func (k *KafkaEmailConsumer) Run(ctx context.Context) {
 				welcomeEmailCounter.Add(emailSpanContext, 1)
 				(*welcomeEmailCounterLock).Unlock()
 			}
+		default:
+			logger.Error("Email Service Kafka", errors.New("unmatched case"), logger.Params{})
+			continue
 		}
 		if k.meter != nil {
 			(*emailCounterLock).Lock()

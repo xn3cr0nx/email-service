@@ -22,10 +22,12 @@ func (p *PostmarkClient) Send(email model.Email) error {
 	return nil
 }
 
-func (p *PostmarkClient) SendBatch(emails []model.Email) error {
-	clientEmails := make([]client.Email, len(emails))
-	for i, email := range emails {
-		clientEmails[i] = modelToEmail(email)
+func (p *PostmarkClient) SendBatch(email model.Email, recipients []string) error {
+	clientEmails := make([]client.Email, len(recipients))
+	for i, recipient := range recipients {
+		model := modelToEmail(email)
+		model.To = recipient
+		clientEmails[i] = model
 	}
 	_, err := p.SendEmailBatch(clientEmails)
 	if err != nil {
