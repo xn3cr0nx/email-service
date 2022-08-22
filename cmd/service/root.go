@@ -88,22 +88,17 @@ func run(cmd *cobra.Command, args []string) {
 
 	ctx := context.Background()
 
-	var tr *trace.Tracer
+	var tr trace.Tracer
 	if env.OtelExporterJaegerEnable {
 		var err error
-		tr, err = tracer.NewTracer(&tracer.Config{
-			Name:     env.ServiceName,
-			Host:     env.OtelExporterJaegerAgentHost,
-			Port:     env.OtelExporterJaegerAgentPort,
-			Exporter: tracer.Jaeger,
-		})
+		tr, err = tracer.NewTracerProvider(ctx, env.ServiceName)
 		if err != nil {
 			logger.Error("Email Service", fmt.Errorf("Cannot initialize tracer: %w", err), logger.Params{})
 			os.Exit(-1)
 		}
 	}
 
-	var mt *metric.Meter
+	var mt metric.Meter
 	if env.OtelExporterPrometheusEnable {
 		var err error
 		mt, err = meter.NewMeter(&meter.Config{Name: env.ServiceName, Port: env.OtelExporterPrometheusPort})

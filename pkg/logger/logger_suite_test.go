@@ -3,11 +3,13 @@ package logger_test
 import (
 	"testing"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/stretchr/testify/suite"
 )
 
-func TestLogger(t *testing.T) {
-	RegisterFailHandler(Fail)
-	RunSpecs(t, "Logger Suite")
+func TestSuite(t *testing.T) {
+	suite.Run(t, new(LoggerTestSuite))
+}
+
+type LoggerTestSuite struct {
+	suite.Suite
 }

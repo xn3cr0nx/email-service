@@ -14,28 +14,36 @@ import (
 	"github.com/xn3cr0nx/email-service/internal/template"
 	"github.com/xn3cr0nx/email-service/pkg/logger"
 	"go.opentelemetry.io/otel/metric"
+	"go.opentelemetry.io/otel/metric/instrument/syncfloat64"
 	"go.opentelemetry.io/otel/trace"
 )
 
 type EmailHandler struct {
 	Mailer mailer.Service
-	tracer *trace.Tracer
+	tracer trace.Tracer
 
-	meter                   *metric.Meter
-	emailCounter            metric.Int64Counter
+	meter                   metric.Meter
+	emailCounter            syncfloat64.Counter
 	emailCounterLock        *sync.RWMutex
-	welcomeEmailCounter     metric.Int64Counter
+	welcomeEmailCounter     syncfloat64.Counter
 	welcomeEmailCounterLock *sync.RWMutex
 }
 
-func NewEmailHandler(m mailer.Service, tracer *trace.Tracer, meter *metric.Meter) *EmailHandler {
+func NewEmailHandler(m mailer.Service, tracer trace.Tracer, meter metric.Meter) *EmailHandler {
 	emailCounterLock := new(sync.RWMutex)
-	var emailCounter metric.Int64Counter
+	var emailCounter syncfloat64.Counter
 	welcomeEmailCounterLock := new(sync.RWMutex)
-	var welcomeEmailCounter metric.Int64Counter
+	var welcomeEmailCounter syncfloat64.Counter
 	if meter != nil {
-		emailCounter = metric.Must(*meter).NewInt64Counter("kafka.emails")
-		welcomeEmailCounter = metric.Must(*meter).NewInt64Counter("kafka.emails.welcome")
+		var err error
+		emailCounter, err = metric.NewNoopMeter().SyncFloat64().Counter("kafka.emails")
+		if err != nil {
+			return nil
+		}
+		welcomeEmailCounter, err = metric.NewNoopMeter().SyncFloat64().Counter("kafka.emails.welcome")
+		if err != nil {
+			return nil
+		}
 	}
 
 	return &EmailHandler{m, tracer, meter, emailCounter, emailCounterLock, welcomeEmailCounter, welcomeEmailCounterLock}

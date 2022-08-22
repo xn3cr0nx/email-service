@@ -33,8 +33,8 @@ type (
 		port   string
 		router *echo.Echo
 		mailer mailer.Service
-		tracer *trace.Tracer
-		meter  *metric.Meter
+		tracer trace.Tracer
+		meter  metric.Meter
 	}
 )
 
@@ -45,7 +45,7 @@ const (
 var server *Server
 
 // NewServer singleton pattern that returns pointer to server
-func NewServer(port int, m mailer.Service, tracer *trace.Tracer, meter *metric.Meter) *Server {
+func NewServer(port int, m mailer.Service, tracer trace.Tracer, meter metric.Meter) *Server {
 	if server != nil {
 		return server
 	}

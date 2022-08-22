@@ -19,12 +19,12 @@ type Service interface {
 
 type service struct {
 	Mailer mailer.Service
-	tracer *trace.Tracer
-	meter  *metric.Meter
+	tracer trace.Tracer
+	meter  metric.Meter
 }
 
 // NewService instantiates a new Service layer for customer
-func NewService(m mailer.Service, tracer *trace.Tracer, meter *metric.Meter) *service {
+func NewService(m mailer.Service, tracer trace.Tracer, meter metric.Meter) *service {
 	return &service{
 		Mailer: m,
 		tracer: tracer,

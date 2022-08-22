@@ -3,31 +3,26 @@ package logger_test
 import (
 	"errors"
 
-	. "github.com/onsi/ginkgo"
 	"github.com/sirupsen/logrus"
 	"github.com/sirupsen/logrus/hooks/test"
-	"github.com/stretchr/testify/assert"
 	"github.com/xn3cr0nx/email-service/pkg/logger"
 )
 
-var _ = Describe("Testing with Ginkgo", func() {
-	It("logger", func() {
+func (s *LoggerTestSuite) TestLogger() {
+	logger.Setup()
+	hook := test.NewLocal(logger.Log)
 
-		logger.Setup()
-		hook := test.NewLocal(logger.Log)
+	logger.Info("test", "testing Info function", logger.Params{"test": "Params"})
+	logger.Warn("test", "testing Warn function", logger.Params{"test": "Params"})
+	logger.Debug("test", "testing Debug function", logger.Params{"test": "Params"})
+	logger.Error("test", errors.New("testing Error function"), logger.Params{"error": "error"})
 
-		logger.Info("test", "testing Info function", logger.Params{"test": "Params"})
-		logger.Warn("test", "testing Warn function", logger.Params{"test": "Params"})
-		logger.Debug("test", "testing Debug function", logger.Params{"test": "Params"})
-		logger.Error("test", errors.New("testing Error function"), logger.Params{"error": "error"})
+	s.Equal(3, len(hook.Entries))
+	s.Equal(string(logrus.InfoLevel), string(hook.Entries[0].Level))
+	s.Equal(string(logrus.WarnLevel), string(hook.Entries[1].Level))
+	s.Equal(string(logrus.ErrorLevel), string(hook.LastEntry().Level))
+	s.Equal("testing Error function", hook.LastEntry().Message)
 
-		assert.Equal(GinkgoT(), 3, len(hook.Entries))
-		assert.Equal(GinkgoT(), string(logrus.InfoLevel), string(hook.Entries[0].Level))
-		assert.Equal(GinkgoT(), string(logrus.WarnLevel), string(hook.Entries[1].Level))
-		assert.Equal(GinkgoT(), string(logrus.ErrorLevel), string(hook.LastEntry().Level))
-		assert.Equal(GinkgoT(), "testing Error function", hook.LastEntry().Message)
-
-		hook.Reset()
-		assert.Nil(GinkgoT(), hook.LastEntry())
-	})
-})
+	hook.Reset()
+	s.Nil(hook.LastEntry())
+}

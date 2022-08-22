@@ -15,34 +15,42 @@ import (
 	"github.com/xn3cr0nx/email-service/pkg/logger"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
+	"go.opentelemetry.io/otel/metric/instrument/syncfloat64"
 	"go.opentelemetry.io/otel/trace"
 )
 
 type KafkaEmailConsumer struct {
 	Reader *kafka.Reader
 	Mailer mailer.Service
-	tracer *trace.Tracer
-	meter  *metric.Meter
+	tracer trace.Tracer
+	meter  metric.Meter
 }
 
-func NewKafkaEmailConsumer(k *kafka.Reader, m mailer.Service, tracer *trace.Tracer, meter *metric.Meter) *KafkaEmailConsumer {
+func NewKafkaEmailConsumer(k *kafka.Reader, m mailer.Service, tracer trace.Tracer, meter metric.Meter) *KafkaEmailConsumer {
 	return &KafkaEmailConsumer{k, m, tracer, meter}
 }
 
 func (k *KafkaEmailConsumer) Run(ctx context.Context) {
 	emailCounterLock := new(sync.RWMutex)
-	var emailCounter metric.Int64Counter
+	var emailCounter syncfloat64.Counter
 	welcomeEmailCounterLock := new(sync.RWMutex)
-	var welcomeEmailCounter metric.Int64Counter
+	var welcomeEmailCounter syncfloat64.Counter
 	if k.meter != nil {
-		emailCounter = metric.Must(*k.meter).NewInt64Counter("kafka.emails")
-		welcomeEmailCounter = metric.Must(*k.meter).NewInt64Counter("kafka.emails.welcome")
+		var err error
+		emailCounter, err = metric.NewNoopMeter().SyncFloat64().Counter("kafka.emails")
+		if err != nil {
+			return
+		}
+		welcomeEmailCounter, err = metric.NewNoopMeter().SyncFloat64().Counter("kafka.emails.welcome")
+		if err != nil {
+			return
+		}
 	}
 
 	var spanContext context.Context
 	var span trace.Span
 	if k.tracer != nil {
-		spanContext, span = (*k.tracer).Start(ctx, "email")
+		spanContext, span = (k.tracer).Start(ctx, "email")
 		defer span.End()
 	} else {
 		spanContext = context.WithValue(ctx, "email", "")
@@ -63,7 +71,7 @@ func (k *KafkaEmailConsumer) Run(ctx context.Context) {
 		var emailSpanContext context.Context
 		var emailSpan trace.Span
 		if k.tracer != nil {
-			emailSpanContext, emailSpan = (*k.tracer).Start(spanContext, string(msg.Key))
+			emailSpanContext, emailSpan = (k.tracer).Start(spanContext, string(msg.Key))
 			emailSpan.SetAttributes(attribute.Key(msg.Key).String(string(msg.Value)))
 		} else {
 			emailSpanContext = context.WithValue(spanContext, string(msg.Key), string(msg.Value))
