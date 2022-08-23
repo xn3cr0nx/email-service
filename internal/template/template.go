@@ -7,15 +7,19 @@ import (
 
 // List of template types.
 const (
-	Layout        = "email:layout"
-	WelcomeEmail  = "email:welcome"
-	ReminderEmail = "email:reminder"
+	Layout            = "email:layout"
+	WelcomeEmail      = "email:welcome"
+	ReminderEmail     = "email:reminder"
+	VerificationEmail = "email:verification"
+	ResetEmail        = "email:reset"
 )
 
 func PathByType(taskType string) string {
 	return map[string]string{
-		Layout:       filepath.Join(cache.Dir, "layout.html"),
-		WelcomeEmail: filepath.Join(cache.Dir, "welcome.html"),
+		Layout:            filepath.Join(cache.Dir, "layout.html"),
+		WelcomeEmail:      filepath.Join(cache.Dir, "welcome.html"),
+		VerificationEmail: filepath.Join(cache.Dir, "verification.html"),
+		ResetEmail:        filepath.Join(cache.Dir, "reset.html"),
 		// ReminderEmail: "",
 	}[taskType]
 }

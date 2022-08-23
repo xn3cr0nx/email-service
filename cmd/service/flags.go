@@ -11,7 +11,10 @@ func parseFlags(env *environment.Env) (err error) {
 	viper.SetDefault("debug", false)
 	viper.SetDefault("name", "Mailer")
 	viper.SetDefault("template_dir", "templates/")
+	viper.SetDefault("sender", "info@test.com")
+	viper.SetDefault("frontend_host", "https://frontend.com")
 	viper.SetDefault("concurrency", 10)
+	viper.SetDefault("queue", "emails")
 	viper.SetDefault("http.host", "localhost")
 	viper.SetDefault("http.port", 8080)
 	viper.SetDefault("redis.host", "localhost")
@@ -34,7 +37,10 @@ func parseFlags(env *environment.Env) (err error) {
 	rootCmd.Flags().BoolVarP(&env.Debug, "debug", "d", viper.GetBool("debug"), "Sets logging level to Debug")
 	rootCmd.Flags().StringVarP(&env.ServiceName, "name", "n", viper.GetString("name"), "Set service name")
 	rootCmd.Flags().StringVar(&env.TemplateDir, "template_dir", viper.GetString("template_dir"), "Define templates folder path")
+	rootCmd.Flags().StringVar(&env.Sender, "sender", viper.GetString("sender"), "Set emails sender")
+	rootCmd.Flags().StringVar(&env.FrontendHost, "frontend_host", viper.GetString("frontend_host"), "Set frontend host")
 	rootCmd.Flags().IntVar(&env.Concurrency, "concurrency", viper.GetInt("concurrency"), "Define templates folder path")
+	rootCmd.Flags().StringVar(&env.Queue, "queue", viper.GetString("queue"), "Set queue broker name")
 	rootCmd.Flags().StringVarP(&env.Host, "host", "s", viper.GetString("http.host"), "bind http server to host")
 	rootCmd.Flags().IntVarP(&env.Port, "port", "p", viper.GetInt("http.port"), "Bind http server to port")
 	rootCmd.Flags().StringVar(&env.RedisHost, "redis_host", viper.GetString("redis.host"), "Set host for redis backend")
@@ -66,7 +72,16 @@ func parseFlags(env *environment.Env) (err error) {
 	if err = viper.BindPFlag("template_dir", rootCmd.Flags().Lookup("template_dir")); err != nil {
 		return
 	}
+	if err = viper.BindPFlag("sender", rootCmd.Flags().Lookup("sender")); err != nil {
+		return
+	}
+	if err = viper.BindPFlag("frontend_host", rootCmd.Flags().Lookup("frontend_host")); err != nil {
+		return
+	}
 	if err = viper.BindPFlag("concurrency", rootCmd.Flags().Lookup("concurrency")); err != nil {
+		return
+	}
+	if err = viper.BindPFlag("queue", rootCmd.Flags().Lookup("queue")); err != nil {
 		return
 	}
 	if err = viper.BindPFlag("http.host", rootCmd.Flags().Lookup("host")); err != nil {

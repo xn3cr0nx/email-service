@@ -51,7 +51,7 @@ func NewEmailHandler(m mailer.Service, tracer trace.Tracer, meter metric.Meter) 
 
 func (h EmailHandler) ProcessTask(ctx context.Context, t *asynq.Task) (err error) {
 	start := time.Now()
-	logger.Info("Email Service Queue", fmt.Sprintf("Start processing"), logger.Params{"type": t.Type})
+	logger.Info("Email Service Queue", "Start processing", logger.Params{"type": t.Type})
 	defer (func() {
 		logger.Info("Email Service Queue", fmt.Sprintf("Finished processing. Elapsed Time = %v", time.Since(start)), logger.Params{"type": t.Type})
 	})()
@@ -73,6 +73,31 @@ func (h EmailHandler) ProcessTask(ctx context.Context, t *asynq.Task) (err error
 			h.welcomeEmailCounter.Add(ctx, 1)
 			(*h.welcomeEmailCounterLock).Unlock()
 		}
+
+	case template.VerificationEmail:
+		var emailTask email.VerificationEmailBody
+		if err = json.Unmarshal(t.Payload(), &emailTask); err != nil {
+			logger.Error("Email Service Queue", err, logger.Params{"type": t.Type()})
+			return
+		}
+
+		if err = emailTask.Process(ctx, h.Mailer); err != nil {
+			logger.Error("Email Service Queue", err, logger.Params{"type": t.Type()})
+			return
+		}
+
+	case template.ResetEmail:
+		var emailTask email.ResetEmailBody
+		if err = json.Unmarshal(t.Payload(), &emailTask); err != nil {
+			logger.Error("Email Service Queue", err, logger.Params{"type": t.Type()})
+			return
+		}
+
+		if err = emailTask.Process(ctx, h.Mailer); err != nil {
+			logger.Error("Email Service Queue", err, logger.Params{"type": t.Type()})
+			return
+		}
+
 	default:
 		return errors.New("unmatched case")
 	}

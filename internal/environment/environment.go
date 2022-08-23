@@ -3,14 +3,17 @@ package environment
 var env *Env
 
 type Env struct {
-	Host        string
-	ServiceName string
-	TemplateDir string
-	Port        int
-	Debug       bool
-	Env         string
-	Rest        bool
-	Concurrency int
+	Host         string
+	ServiceName  string
+	TemplateDir  string
+	Port         int
+	Debug        bool
+	Env          string
+	Rest         bool
+	Concurrency  int
+	Sender       string
+	FrontendHost string
+	Queue        string
 
 	// redis related variables
 	RedisHost     string

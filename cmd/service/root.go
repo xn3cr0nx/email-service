@@ -136,6 +136,9 @@ func run(cmd *cobra.Command, args []string) {
 			},
 			asynq.Config{
 				Concurrency: env.Concurrency,
+				Queues: map[string]int{
+					string(env.Queue): 10,
+				},
 			})
 		defer server.Stop()
 
