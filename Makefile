@@ -15,7 +15,7 @@ SERVICE_BINARY=server
 
 # Docker
 DOCKER=docker
-DC=docker-compose
+DC=docker compose
 DCUP=up -d
 
 default: run
@@ -47,9 +47,12 @@ docs:
 run: docs
 	reflex -r '\.go$$' -R './docs/*.go' -s -- sh -c 'config="./config/local.json" $(GORUN) $(SERVICE)'
 
-docker-server:
+up:
 	$(DC) $(DCUP) service
 
-kafka:
+up-asynq:
+	$(DC) $(DCUP) --remove-orphans redis asynqmon
+
+up-kafka:
 # MY_IP=192.168.1.12 $(DC) $(DCUP) --remove-orphans zk1 zk2 zk3 kafka1 kafka2 kafka3
 	$(DC) $(DCUP) --remove-orphans zookeeper kafka
