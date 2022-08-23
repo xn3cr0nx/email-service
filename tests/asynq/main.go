@@ -8,7 +8,7 @@ import (
 	"github.com/hibiken/asynq"
 	"github.com/xn3cr0nx/email-service/internal/email"
 	"github.com/xn3cr0nx/email-service/internal/template"
-	"github.com/xn3cr0nx/email-service/tests/utils"
+	"github.com/xn3cr0nx/email-service/pkg/random"
 )
 
 const (
@@ -23,12 +23,12 @@ func main() {
 
 	for i := 0; i < 20; i++ {
 		w := email.WelcomeEmailBody{
-			From:    utils.RandomEmail(),
-			To:      utils.RandomEmail(),
-			Subject: utils.RandomString(),
+			From:    random.Email(),
+			To:      random.Email(),
+			Subject: random.String(),
 			Params: email.WelcomeEmailBodyParams{
-				Name: utils.RandomString(),
-				URL:  utils.RandomEmail(),
+				Name: random.String(),
+				URL:  random.Email(),
 			}}
 		bytes, err := json.Marshal(w)
 		if err != nil {

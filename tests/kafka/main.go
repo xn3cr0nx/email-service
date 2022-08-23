@@ -8,7 +8,7 @@ import (
 	"github.com/segmentio/kafka-go"
 	"github.com/xn3cr0nx/email-service/internal/email"
 	"github.com/xn3cr0nx/email-service/internal/template"
-	"github.com/xn3cr0nx/email-service/tests/utils"
+	"github.com/xn3cr0nx/email-service/pkg/random"
 )
 
 // the topic and broker address are initialized as constants
@@ -41,12 +41,12 @@ func produce(ctx context.Context) {
 
 	for i := 0; i < times; i++ {
 		message := email.WelcomeEmailBody{
-			From:    utils.RandomEmail(),
-			To:      utils.RandomEmail(),
-			Subject: utils.RandomString(),
+			From:    random.Email(),
+			To:      random.Email(),
+			Subject: random.String(),
 			Params: email.WelcomeEmailBodyParams{
-				Name: utils.RandomString(),
-				URL:  utils.RandomEmail(),
+				Name: random.String(),
+				URL:  random.Email(),
 			}}
 
 		bytes, err := json.Marshal(message)
