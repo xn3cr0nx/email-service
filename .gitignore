@@ -32,3 +32,6 @@ swagger.yaml
 # project related folders
 /config/*
 /templates/*
+
+/bin
+/build
