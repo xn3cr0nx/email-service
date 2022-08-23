@@ -30,7 +30,7 @@ func NewKafkaEmailConsumer(k *kafka.Reader, m mailer.Service, tracer trace.Trace
 	return &KafkaEmailConsumer{k, m, tracer, meter}
 }
 
-func (k *KafkaEmailConsumer) Run(ctx context.Context) {
+func (k *KafkaEmailConsumer) Run(ctx context.Context) error {
 	emailCounterLock := new(sync.RWMutex)
 	var emailCounter syncfloat64.Counter
 	welcomeEmailCounterLock := new(sync.RWMutex)
@@ -39,11 +39,11 @@ func (k *KafkaEmailConsumer) Run(ctx context.Context) {
 		var err error
 		emailCounter, err = metric.NewNoopMeter().SyncFloat64().Counter("kafka.emails")
 		if err != nil {
-			return
+			return err
 		}
 		welcomeEmailCounter, err = metric.NewNoopMeter().SyncFloat64().Counter("kafka.emails.welcome")
 		if err != nil {
-			return
+			return err
 		}
 	}
 

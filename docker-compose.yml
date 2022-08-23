@@ -9,6 +9,27 @@ x-network: &network
     - service
 
 services:
+  service:
+    container_name: service
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+    volumes:
+      - ./config:/root/config
+    ports:
+      - 6066:6066
+    <<: *network
+
+  docs:
+    container_name: docs
+    build:
+      context: .
+      dockerfile: ./docs.Dockerfile
+    ports:
+      - 8085:8085
+    <<: *network
+
+  # asynq related services
   redis:
     image: redis:4
     container_name: *redis-host
@@ -26,24 +47,6 @@ services:
       - redis_addr=redis:6379
     ports:
       - 8080:8080
-    <<: *network
-
-  service:
-    container_name: service
-    build:
-      context: .
-      dockerfile: ./Dockerfile
-    ports:
-      - 6066:6066
-    <<: *network
-
-  docs:
-    container_name: docs
-    build:
-      context: .
-      dockerfile: ./docs.Dockerfile
-    ports:
-      - 8085:8085
     <<: *network
 
   # Kafka related services
@@ -68,8 +71,39 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
     <<: *network
 
+  # NATS related services
+  nats1:
+    image: nats:2.8
+    container_name: nats
+    ports:
+      - "4222:4222"
+      - "8222:8222"
+    command: "--cluster_name NATS --cluster nats://0.0.0.0:6222 --http_port 8222"
+    volumes:
+      - nats:/data/nats-server/jetstream
+    <<: *network
+  nats2:
+    image: nats:2.8
+    container_name: nats2
+    command: "--cluster_name NATS --cluster nats://0.0.0.0:6222 --routes=nats://ruser:T0pS3cr3t@nats:6222"
+    volumes:
+      - nats1:/data/nats-server/jetstream
+    depends_on: ["nats1"]
+    <<: *network
+  nats3:
+    image: nats:2.8
+    container_name: nats3
+    command: "--cluster_name NATS --cluster nats://0.0.0.0:6222 --routes=nats://ruser:T0pS3cr3t@nats:6222"
+    volumes:
+      - nats2:/data/nats-server/jetstream
+    depends_on: ["nats1"]    
+    <<: *network
+
 volumes:
   redis:
+  nats:
+  nats1:
+  nats2:
 
 networks:
   service:

@@ -17,15 +17,18 @@ func parseFlags(env *environment.Env) (err error) {
 	viper.SetDefault("queue", "emails")
 	viper.SetDefault("http.host", "localhost")
 	viper.SetDefault("http.port", 8080)
+	viper.SetDefault("backend", "nats")
 	viper.SetDefault("redis.host", "localhost")
 	viper.SetDefault("redis.port", 6379)
 	viper.SetDefault("redis.password", "")
 	viper.SetDefault("redis.db", 0)
-	viper.SetDefault("asynq.enabled", true)
 	viper.SetDefault("asynq.db", 2)
 	viper.SetDefault("kafka.addresses", []string{"localhost:6789"})
 	viper.SetDefault("kafka.topic", "emails")
 	viper.SetDefault("kafka.group", "my-group")
+	viper.SetDefault("nats.host", "localhost")
+	viper.SetDefault("nats.port", 4222)
+	viper.SetDefault("nats.subject", "emails")
 	viper.SetDefault("otel.jaeger.enable", false)
 	viper.SetDefault("otel.jaeger.host", "jaeger")
 	viper.SetDefault("otel.jaeger.port", 14268)
@@ -43,14 +46,17 @@ func parseFlags(env *environment.Env) (err error) {
 	rootCmd.Flags().StringVar(&env.Queue, "queue", viper.GetString("queue"), "Set queue broker name")
 	rootCmd.Flags().StringVarP(&env.Host, "host", "s", viper.GetString("http.host"), "bind http server to host")
 	rootCmd.Flags().IntVarP(&env.Port, "port", "p", viper.GetInt("http.port"), "Bind http server to port")
+	rootCmd.Flags().StringVar(&env.Backend, "backend", viper.GetString("backend"), "Define which backend the service is configured to rely on - Options: asynq, kafka, nats")
 	rootCmd.Flags().StringVar(&env.RedisHost, "redis_host", viper.GetString("redis.host"), "Set host for redis backend")
 	rootCmd.Flags().IntVar(&env.RedisPort, "redis_port", viper.GetInt("redis.port"), "Set port for redis backend")
 	rootCmd.Flags().StringVar(&env.RedisPassword, "redis_password", viper.GetString("redis.password"), "Set password for redis backend")
 	rootCmd.Flags().IntVar(&env.RedisDB, "redis_db", viper.GetInt("redis.db"), "Set redis database number")
-	rootCmd.Flags().BoolVar(&env.AsynqEnabled, "asynq_enabled", viper.GetBool("asynq.enabled"), "Set asynq as broker")
 	rootCmd.Flags().StringSliceVar(&env.KafkaAddresses, "kafka_addresses", viper.GetStringSlice("kafka.addresses"), "Set kafka brokers' address")
 	rootCmd.Flags().StringVar(&env.KafkaTopic, "kafka_topic", viper.GetString("kafka.topic"), "Set kafka topic")
 	rootCmd.Flags().StringVar(&env.KafkaGroup, "kafka_group", viper.GetString("kafka.group"), "Set kafka group")
+	rootCmd.Flags().StringVar(&env.NatsHost, "nats_host", viper.GetString("nats.host"), "Set host for nats backend")
+	rootCmd.Flags().IntVar(&env.NatsPort, "nats_port", viper.GetInt("nats.port"), "Set port for nats backend")
+	rootCmd.Flags().StringVar(&env.NatsSubject, "nats_subject", viper.GetString("nats.subject"), "Set subject for nats subscriber")
 	rootCmd.Flags().BoolVar(&env.OtelExporterJaegerEnable, "otel_exporter_jaeger_enable", viper.GetBool("otel.jaeger.enable"), "Enable OpenTelemetry based jager tracing")
 	rootCmd.Flags().StringVar(&env.OtelExporterJaegerAgentHost, "otel_exporter_jaeger_agent_host", viper.GetString("otel.jaeger.host"), "Override Jaeger agent hostname")
 	rootCmd.Flags().IntVar(&env.OtelExporterJaegerAgentPort, "otel_exporter_jaeger_agent_port", viper.GetInt("otel.jaeger.port"), "Override Jaeger agent port")
@@ -90,6 +96,9 @@ func parseFlags(env *environment.Env) (err error) {
 	if err = viper.BindPFlag("http.port", rootCmd.Flags().Lookup("port")); err != nil {
 		return
 	}
+	if err = viper.BindPFlag("backend", rootCmd.Flags().Lookup("backend")); err != nil {
+		return
+	}
 	if err = viper.BindPFlag("redis.host", rootCmd.Flags().Lookup("redis_host")); err != nil {
 		return
 	}
@@ -102,9 +111,6 @@ func parseFlags(env *environment.Env) (err error) {
 	if err = viper.BindPFlag("redis.db", rootCmd.Flags().Lookup("redis_db")); err != nil {
 		return
 	}
-	if err = viper.BindPFlag("asynq_enabled", rootCmd.Flags().Lookup("asynq_enabled")); err != nil {
-		return
-	}
 	if err = viper.BindPFlag("kafka.addresses", rootCmd.Flags().Lookup("kafka_addresses")); err != nil {
 		return
 	}
@@ -112,6 +118,15 @@ func parseFlags(env *environment.Env) (err error) {
 		return
 	}
 	if err = viper.BindPFlag("kafka.group", rootCmd.Flags().Lookup("kafka_group")); err != nil {
+		return
+	}
+	if err = viper.BindPFlag("nats.host", rootCmd.Flags().Lookup("nats_host")); err != nil {
+		return
+	}
+	if err = viper.BindPFlag("nats.port", rootCmd.Flags().Lookup("nats_port")); err != nil {
+		return
+	}
+	if err = viper.BindPFlag("nats.subject", rootCmd.Flags().Lookup("nats_subject")); err != nil {
 		return
 	}
 	if err = viper.BindPFlag("otel.jaeger.enable", rootCmd.Flags().Lookup("otel_exporter_jaeger_enable")); err != nil {

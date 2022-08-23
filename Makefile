@@ -56,3 +56,6 @@ up-asynq:
 up-kafka:
 # MY_IP=192.168.1.12 $(DC) $(DCUP) --remove-orphans zk1 zk2 zk3 kafka1 kafka2 kafka3
 	$(DC) $(DCUP) --remove-orphans zookeeper kafka
+
+up-nats:
+	$(DC) $(DCUP) --remove-orphans nats1 nats2 nats3

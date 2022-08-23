@@ -15,17 +15,23 @@ type Env struct {
 	FrontendHost string
 	Queue        string
 
+	Backend string
+
 	// redis related variables
 	RedisHost     string
 	RedisPort     int
 	RedisPassword string
 	RedisDB       int
-	AsynqEnabled  bool
 
 	// kafka related variables
 	KafkaAddresses []string
 	KafkaTopic     string
 	KafkaGroup     string
+
+	// nats related variables
+	NatsHost    string
+	NatsPort    int
+	NatsSubject string
 
 	OtelExporterJaegerEnable     bool
 	OtelExporterJaegerAgentHost  string

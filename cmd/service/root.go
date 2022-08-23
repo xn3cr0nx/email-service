@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/hibiken/asynq"
+	"github.com/nats-io/nats.go"
 	"github.com/segmentio/kafka-go"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -126,7 +127,7 @@ func run(cmd *cobra.Command, args []string) {
 		go s.Listen()
 	}
 
-	if env.AsynqEnabled {
+	if env.Backend == "asynq" {
 		redisAddress := fmt.Sprintf("%s:%d", env.RedisHost, env.RedisPort)
 		server := asynq.NewServer(
 			asynq.RedisClientOpt{
@@ -144,14 +145,28 @@ func run(cmd *cobra.Command, args []string) {
 
 		h := task.NewEmailHandler(mailer, tr, mt)
 		if err := server.Run(h); err != nil {
-			logger.Error("Email Service", fmt.Errorf("Cannot start queue server %v", err), logger.Params{})
+			logger.Error("Email Service", fmt.Errorf("cannot start queue server %v", err), logger.Params{})
 		}
 
 		sigs := make(chan os.Signal, 1)
 		signal.Notify(sigs, unix.SIGTERM, unix.SIGINT)
 		<-sigs // wait for termination signal
 		server.Stop()
-	} else {
+	} else if env.Backend == "nats" {
+		natsAddress := fmt.Sprintf("nats://%s:%d", env.NatsHost, env.NatsPort)
+		nc, err := nats.Connect(natsAddress)
+		if err != nil {
+			logger.Error("Email Service", fmt.Errorf("cannot connect NATS broker: %v", err), logger.Params{})
+			os.Exit(-1)
+		}
+
+		subscriber := task.NewNatsEmailConsumer(nc, mailer, tr, mt)
+		// blocking consumer reading messages
+		if err := subscriber.Run(ctx); err != nil {
+			logger.Error("Email service", err, logger.Params{})
+			os.Exit(-1)
+		}
+	} else if env.Backend == "kafka" {
 		// initialize a new reader with the brokers and topic
 		// the groupID identifies the consumer and prevents
 		// it from receiving duplicate messages
@@ -165,7 +180,13 @@ func run(cmd *cobra.Command, args []string) {
 		consumer := task.NewKafkaEmailConsumer(r, mailer, tr, mt)
 		defer r.Close()
 		// blocking consumer reading messages
-		consumer.Run(ctx)
+		if err := consumer.Run(ctx); err != nil {
+			logger.Error("Email service", err, logger.Params{})
+			os.Exit(-1)
+		}
+	} else {
+		logger.Error("Email service", errors.New("not valid backend configured"), logger.Params{"env": env.Backend})
+		os.Exit(-1)
 	}
 }
 
@@ -174,6 +195,7 @@ var (
 	errMissingRedisAddress    = errors.New("missing redis address")
 	errRedisDbOutOfRange      = errors.New("redis db out of range. allowed range 0-15")
 	errQueueConcurrencyNotSet = errors.New("queue concurrent workers number not defined. min 1")
+	errMissingNatsAddress     = errors.New("missing nats address")
 )
 
 func validateConfig(env *environment.Env) error {
@@ -183,7 +205,7 @@ func validateConfig(env *environment.Env) error {
 		}
 	}
 
-	if env.AsynqEnabled {
+	if env.Backend == "asynq" {
 		if env.RedisHost == "" || env.RedisPort == 0 {
 			return errMissingRedisAddress
 		}
@@ -192,6 +214,12 @@ func validateConfig(env *environment.Env) error {
 		}
 		if env.Concurrency == 0 {
 			return errQueueConcurrencyNotSet
+		}
+	}
+
+	if env.Backend == "nats" {
+		if env.NatsHost == "" || env.NatsPort == 0 {
+			return errMissingNatsAddress
 		}
 	}
 
