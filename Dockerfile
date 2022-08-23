@@ -2,7 +2,7 @@
 # Builder
 ################################################################################
 # FROM dependencies as builder 
-FROM golang:1.16.2 as builder
+FROM golang:1.18 as builder
 LABEL maintainer="Patrick Jusic <patrick.jusic@toggl.com>"
 
 WORKDIR /service
