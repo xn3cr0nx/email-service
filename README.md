@@ -9,6 +9,7 @@ The service can be configured in order to rely on a broker as Kafka, or async qu
 
 - Postmark
 - Sendgrid
+- Mailgun
 
 ## Supported backend
 

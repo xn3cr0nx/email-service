@@ -1,6 +1,8 @@
 package postmark
 
 import (
+	"context"
+
 	client "github.com/keighl/postmark"
 	"github.com/xn3cr0nx/email-service/pkg/model"
 )
@@ -14,7 +16,7 @@ func NewClient(serverToken, accountToken string) *PostmarkClient {
 	return &PostmarkClient{c}
 }
 
-func (p *PostmarkClient) Send(email model.Email) error {
+func (p *PostmarkClient) Send(ctx context.Context, email model.Email) error {
 	_, err := p.SendEmail(modelToEmail(email))
 	if err != nil {
 		return err
@@ -22,7 +24,7 @@ func (p *PostmarkClient) Send(email model.Email) error {
 	return nil
 }
 
-func (p *PostmarkClient) SendBatch(email model.Email, recipients []string) error {
+func (p *PostmarkClient) SendBatch(ctx context.Context, email model.Email, recipients []string) error {
 	clientEmails := make([]client.Email, len(recipients))
 	for i, recipient := range recipients {
 		model := modelToEmail(email)

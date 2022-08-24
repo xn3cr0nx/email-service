@@ -60,7 +60,7 @@ func (b *WelcomeEmailBody) Process(ctx context.Context, m provider.Mailer) error
 	html := string(cache.Get(path))
 	filledHtml := fmt.Sprintf(html, b.Params.Name, b.Params.URL)
 
-	if err := m.Send(model.Email{
+	if err := m.Send(ctx, model.Email{
 		From:     b.From,
 		To:       b.To,
 		Subject:  b.Subject,

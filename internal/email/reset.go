@@ -57,7 +57,7 @@ func (b *ResetEmailBody) Process(ctx context.Context, m provider.Mailer) error {
 	html := string(cache.Get(path))
 	filledHtml := fmt.Sprintf(html, b.Params.URL, b.Params.URL)
 
-	if err := m.Send(model.Email{
+	if err := m.Send(ctx, model.Email{
 		From:     b.From,
 		To:       b.To,
 		Subject:  b.Subject,

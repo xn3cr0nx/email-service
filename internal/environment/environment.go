@@ -25,6 +25,10 @@ type Env struct {
 	// sendgrid related variables
 	SendgridAPIKey string
 
+	// mailgun related variables
+	MailgunDomain string
+	MailgunAPIKey string
+
 	// redis related variables
 	RedisHost     string
 	RedisPort     int
