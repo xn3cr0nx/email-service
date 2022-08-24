@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"net/url"
 
-	"github.com/xn3cr0nx/email-service/internal/mailer"
+	"github.com/xn3cr0nx/email-service/internal/provider"
 	"github.com/xn3cr0nx/email-service/internal/template"
 	"github.com/xn3cr0nx/email-service/pkg/model"
 )
@@ -42,7 +42,7 @@ func (b *WelcomeEmailBody) ValidateBody() error {
 	return nil
 }
 
-func (b *WelcomeEmailBody) Process(ctx context.Context, m mailer.Service) error {
+func (b *WelcomeEmailBody) Process(ctx context.Context, m provider.Mailer) error {
 	if err := b.ValidateBody(); err != nil {
 		return err
 	}

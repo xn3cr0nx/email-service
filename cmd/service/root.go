@@ -14,10 +14,12 @@ import (
 	"github.com/segmentio/kafka-go"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"github.com/xn3cr0nx/email-service/internal/backend"
 	"github.com/xn3cr0nx/email-service/internal/environment"
-	"github.com/xn3cr0nx/email-service/internal/mailer/postmark"
+	"github.com/xn3cr0nx/email-service/internal/provider"
+	"github.com/xn3cr0nx/email-service/internal/provider/postmark"
+	"github.com/xn3cr0nx/email-service/internal/provider/sendgrid"
 	"github.com/xn3cr0nx/email-service/internal/server"
-	"github.com/xn3cr0nx/email-service/internal/task"
 	"github.com/xn3cr0nx/email-service/internal/template"
 	"github.com/xn3cr0nx/email-service/pkg/logger"
 	"github.com/xn3cr0nx/email-service/pkg/meter"
@@ -83,7 +85,7 @@ func run(cmd *cobra.Command, args []string) {
 	env := environment.Get()
 
 	if err := validateConfig(env); err != nil {
-		logger.Error("Email Service", fmt.Errorf("Configuration error: %w", err), logger.Params{})
+		logger.Error("Email Service", fmt.Errorf("configuration error: %w", err), logger.Params{})
 		os.Exit(-1)
 	}
 
@@ -94,7 +96,7 @@ func run(cmd *cobra.Command, args []string) {
 		var err error
 		tr, err = tracer.NewTracerProvider(ctx, env.ServiceName)
 		if err != nil {
-			logger.Error("Email Service", fmt.Errorf("Cannot initialize tracer: %w", err), logger.Params{})
+			logger.Error("Email Service", fmt.Errorf("cannot initialize tracer: %w", err), logger.Params{})
 			os.Exit(-1)
 		}
 	}
@@ -104,7 +106,7 @@ func run(cmd *cobra.Command, args []string) {
 		var err error
 		mt, err = meter.NewMeter(&meter.Config{Name: env.ServiceName, Port: env.OtelExporterPrometheusPort})
 		if err != nil {
-			logger.Error("Email Service", fmt.Errorf("Cannot initialize tracer: %w", err), logger.Params{})
+			logger.Error("Email Service", fmt.Errorf("cannot initialize tracer: %w", err), logger.Params{})
 			os.Exit(-1)
 		}
 	}
@@ -116,11 +118,19 @@ func run(cmd *cobra.Command, args []string) {
 	}
 	_, err := template.NewTemplateCache(&templateDir)
 	if err != nil {
-		logger.Error("Email Service", fmt.Errorf("Cannot initialize template cache: %w", err), logger.Params{})
+		logger.Error("Email Service", fmt.Errorf("cannot initialize template cache: %w", err), logger.Params{})
 		os.Exit(-1)
 	}
 
-	mailer := postmark.NewClient(viper.GetString("postmark.server"), viper.GetString("postmark.account"))
+	var mailer provider.Mailer
+	if env.Provider == "postmark" {
+		mailer = postmark.NewClient(viper.GetString("postmark.server"), viper.GetString("postmark.account"))
+	} else if env.Provider == "sendgrid" {
+		mailer = sendgrid.NewClient(env.SendgridAPIKey)
+	} else {
+		logger.Error("Email service", errInvalidProvider, logger.Params{"env": env.Backend})
+		os.Exit(-1)
+	}
 
 	if env.Rest {
 		s := server.NewServer(env.Port, mailer, tr, mt)
@@ -143,7 +153,7 @@ func run(cmd *cobra.Command, args []string) {
 			})
 		defer server.Stop()
 
-		h := task.NewEmailHandler(mailer, tr, mt)
+		h := backend.NewEmailHandler(mailer, tr, mt)
 		if err := server.Run(h); err != nil {
 			logger.Error("Email Service", fmt.Errorf("cannot start queue server %v", err), logger.Params{})
 		}
@@ -160,7 +170,7 @@ func run(cmd *cobra.Command, args []string) {
 			os.Exit(-1)
 		}
 
-		subscriber := task.NewNatsEmailConsumer(nc, mailer, tr, mt)
+		subscriber := backend.NewNatsEmailConsumer(nc, mailer, tr, mt)
 		// blocking consumer reading messages
 		if err := subscriber.Run(ctx); err != nil {
 			logger.Error("Email service", err, logger.Params{})
@@ -177,7 +187,7 @@ func run(cmd *cobra.Command, args []string) {
 			GroupID:     env.KafkaGroup,
 			Logger:      logger.Log,
 		})
-		consumer := task.NewKafkaEmailConsumer(r, mailer, tr, mt)
+		consumer := backend.NewKafkaEmailConsumer(r, mailer, tr, mt)
 		defer r.Close()
 		// blocking consumer reading messages
 		if err := consumer.Run(ctx); err != nil {
@@ -185,7 +195,7 @@ func run(cmd *cobra.Command, args []string) {
 			os.Exit(-1)
 		}
 	} else {
-		logger.Error("Email service", errors.New("not valid backend configured"), logger.Params{"env": env.Backend})
+		logger.Error("Email service", errInvalidBackend, logger.Params{"env": env.Backend})
 		os.Exit(-1)
 	}
 }
@@ -196,6 +206,8 @@ var (
 	errRedisDbOutOfRange      = errors.New("redis db out of range. allowed range 0-15")
 	errQueueConcurrencyNotSet = errors.New("queue concurrent workers number not defined. min 1")
 	errMissingNatsAddress     = errors.New("missing nats address")
+	errInvalidProvider        = errors.New("invalid provider configured")
+	errInvalidBackend         = errors.New("invalid backend configured")
 )
 
 func validateConfig(env *environment.Env) error {

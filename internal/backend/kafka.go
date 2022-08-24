@@ -1,4 +1,4 @@
-package task
+package backend
 
 import (
 	"context"
@@ -10,7 +10,7 @@ import (
 
 	"github.com/segmentio/kafka-go"
 	"github.com/xn3cr0nx/email-service/internal/email"
-	"github.com/xn3cr0nx/email-service/internal/mailer"
+	"github.com/xn3cr0nx/email-service/internal/provider"
 	"github.com/xn3cr0nx/email-service/internal/template"
 	"github.com/xn3cr0nx/email-service/pkg/logger"
 	"go.opentelemetry.io/otel/attribute"
@@ -21,12 +21,12 @@ import (
 
 type KafkaEmailConsumer struct {
 	Reader *kafka.Reader
-	Mailer mailer.Service
+	Mailer provider.Mailer
 	tracer trace.Tracer
 	meter  metric.Meter
 }
 
-func NewKafkaEmailConsumer(k *kafka.Reader, m mailer.Service, tracer trace.Tracer, meter metric.Meter) *KafkaEmailConsumer {
+func NewKafkaEmailConsumer(k *kafka.Reader, m provider.Mailer, tracer trace.Tracer, meter metric.Meter) *KafkaEmailConsumer {
 	return &KafkaEmailConsumer{k, m, tracer, meter}
 }
 

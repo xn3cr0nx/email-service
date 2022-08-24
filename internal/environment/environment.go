@@ -15,7 +15,15 @@ type Env struct {
 	FrontendHost string
 	Queue        string
 
-	Backend string
+	Provider string
+	Backend  string
+
+	// postmark related variables
+	PostmarkServer  string
+	PostmarkAccount string
+
+	// sendgrid related variables
+	SendgridAPIKey string
 
 	// redis related variables
 	RedisHost     string

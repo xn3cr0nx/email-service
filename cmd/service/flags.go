@@ -17,7 +17,11 @@ func parseFlags(env *environment.Env) (err error) {
 	viper.SetDefault("queue", "emails")
 	viper.SetDefault("http.host", "localhost")
 	viper.SetDefault("http.port", 8080)
+	viper.SetDefault("provider", "postmark")
 	viper.SetDefault("backend", "nats")
+	viper.SetDefault("postmark.server", "")
+	viper.SetDefault("postmark.account", "")
+	viper.SetDefault("sendgrid.api_key", "")
 	viper.SetDefault("redis.host", "localhost")
 	viper.SetDefault("redis.port", 6379)
 	viper.SetDefault("redis.password", "")
@@ -46,7 +50,11 @@ func parseFlags(env *environment.Env) (err error) {
 	rootCmd.Flags().StringVar(&env.Queue, "queue", viper.GetString("queue"), "Set queue broker name")
 	rootCmd.Flags().StringVarP(&env.Host, "host", "s", viper.GetString("http.host"), "bind http server to host")
 	rootCmd.Flags().IntVarP(&env.Port, "port", "p", viper.GetInt("http.port"), "Bind http server to port")
+	rootCmd.Flags().StringVar(&env.Provider, "provider", viper.GetString("provider"), "Define which email provider the service is configured to rely on - Options: postmark, sendgrid")
 	rootCmd.Flags().StringVar(&env.Backend, "backend", viper.GetString("backend"), "Define which backend the service is configured to rely on - Options: asynq, kafka, nats")
+	rootCmd.Flags().StringVar(&env.PostmarkServer, "postmark_server", viper.GetString("postmark.server"), "Set postmark server key")
+	rootCmd.Flags().StringVar(&env.PostmarkAccount, "postmark_account", viper.GetString("postmark.account"), "Set postmark account key")
+	rootCmd.Flags().StringVar(&env.SendgridAPIKey, "sendgrid_api_key", viper.GetString("sendgrid.api_key"), "Set sendgrid api key")
 	rootCmd.Flags().StringVar(&env.RedisHost, "redis_host", viper.GetString("redis.host"), "Set host for redis backend")
 	rootCmd.Flags().IntVar(&env.RedisPort, "redis_port", viper.GetInt("redis.port"), "Set port for redis backend")
 	rootCmd.Flags().StringVar(&env.RedisPassword, "redis_password", viper.GetString("redis.password"), "Set password for redis backend")
@@ -90,13 +98,26 @@ func parseFlags(env *environment.Env) (err error) {
 	if err = viper.BindPFlag("queue", rootCmd.Flags().Lookup("queue")); err != nil {
 		return
 	}
+
 	if err = viper.BindPFlag("http.host", rootCmd.Flags().Lookup("host")); err != nil {
 		return
 	}
 	if err = viper.BindPFlag("http.port", rootCmd.Flags().Lookup("port")); err != nil {
 		return
 	}
+	if err = viper.BindPFlag("provider", rootCmd.Flags().Lookup("provider")); err != nil {
+		return
+	}
 	if err = viper.BindPFlag("backend", rootCmd.Flags().Lookup("backend")); err != nil {
+		return
+	}
+	if err = viper.BindPFlag("postmark.server", rootCmd.Flags().Lookup("postmark_server")); err != nil {
+		return
+	}
+	if err = viper.BindPFlag("postmark.account", rootCmd.Flags().Lookup("postmark_account")); err != nil {
+		return
+	}
+	if err = viper.BindPFlag("sendgrid.api_key", rootCmd.Flags().Lookup("sendgrid_api_key")); err != nil {
 		return
 	}
 	if err = viper.BindPFlag("redis.host", rootCmd.Flags().Lookup("redis_host")); err != nil {

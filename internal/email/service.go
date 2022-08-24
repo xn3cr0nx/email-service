@@ -5,7 +5,7 @@ import (
 	"net/http"
 
 	"github.com/labstack/echo/v4"
-	"github.com/xn3cr0nx/email-service/internal/mailer"
+	"github.com/xn3cr0nx/email-service/internal/provider"
 	"github.com/xn3cr0nx/email-service/pkg/validator"
 	"go.opentelemetry.io/otel/metric"
 	"go.opentelemetry.io/otel/trace"
@@ -18,13 +18,13 @@ type Service interface {
 }
 
 type service struct {
-	Mailer mailer.Service
+	Mailer provider.Mailer
 	tracer trace.Tracer
 	meter  metric.Meter
 }
 
 // NewService instantiates a new Service layer for customer
-func NewService(m mailer.Service, tracer trace.Tracer, meter metric.Meter) *service {
+func NewService(m provider.Mailer, tracer trace.Tracer, meter metric.Meter) *service {
 	return &service{
 		Mailer: m,
 		tracer: tracer,

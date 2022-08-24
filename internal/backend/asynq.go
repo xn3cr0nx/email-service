@@ -1,4 +1,4 @@
-package task
+package backend
 
 import (
 	"context"
@@ -10,7 +10,7 @@ import (
 
 	"github.com/hibiken/asynq"
 	"github.com/xn3cr0nx/email-service/internal/email"
-	"github.com/xn3cr0nx/email-service/internal/mailer"
+	"github.com/xn3cr0nx/email-service/internal/provider"
 	"github.com/xn3cr0nx/email-service/internal/template"
 	"github.com/xn3cr0nx/email-service/pkg/logger"
 	"go.opentelemetry.io/otel/metric"
@@ -19,7 +19,7 @@ import (
 )
 
 type EmailHandler struct {
-	Mailer mailer.Service
+	Mailer provider.Mailer
 	tracer trace.Tracer
 
 	meter                   metric.Meter
@@ -29,7 +29,7 @@ type EmailHandler struct {
 	welcomeEmailCounterLock *sync.RWMutex
 }
 
-func NewEmailHandler(m mailer.Service, tracer trace.Tracer, meter metric.Meter) *EmailHandler {
+func NewEmailHandler(m provider.Mailer, tracer trace.Tracer, meter metric.Meter) *EmailHandler {
 	emailCounterLock := new(sync.RWMutex)
 	var emailCounter syncfloat64.Counter
 	welcomeEmailCounterLock := new(sync.RWMutex)

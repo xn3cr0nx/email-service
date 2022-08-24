@@ -1,4 +1,4 @@
-package task
+package backend
 
 import (
 	"context"
@@ -11,7 +11,7 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/xn3cr0nx/email-service/internal/email"
 	"github.com/xn3cr0nx/email-service/internal/environment"
-	"github.com/xn3cr0nx/email-service/internal/mailer"
+	"github.com/xn3cr0nx/email-service/internal/provider"
 	"github.com/xn3cr0nx/email-service/internal/template"
 	"github.com/xn3cr0nx/email-service/pkg/logger"
 	"go.opentelemetry.io/otel/attribute"
@@ -22,7 +22,7 @@ import (
 
 type NatsEmailConsumer struct {
 	Subscriber *nats.Conn
-	Mailer     mailer.Service
+	Mailer     provider.Mailer
 	tracer     trace.Tracer
 	meter      metric.Meter
 }
@@ -32,7 +32,7 @@ type NatsMessage struct {
 	Value []byte
 }
 
-func NewNatsEmailConsumer(n *nats.Conn, m mailer.Service, tracer trace.Tracer, meter metric.Meter) *NatsEmailConsumer {
+func NewNatsEmailConsumer(n *nats.Conn, m provider.Mailer, tracer trace.Tracer, meter metric.Meter) *NatsEmailConsumer {
 	return &NatsEmailConsumer{n, m, tracer, meter}
 }
 

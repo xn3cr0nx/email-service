@@ -1,8 +1,8 @@
-package mailer
+package provider
 
 import "github.com/xn3cr0nx/email-service/pkg/model"
 
-type Service interface {
+type Mailer interface {
 	Send(model.Email) error
 	SendBatch(model.Email, []string) error
 }

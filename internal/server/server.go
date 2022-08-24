@@ -21,7 +21,7 @@ import (
 	"github.com/spf13/viper"
 	echoSwagger "github.com/swaggo/echo-swagger"
 	"github.com/xn3cr0nx/email-service/internal/email"
-	"github.com/xn3cr0nx/email-service/internal/mailer"
+	"github.com/xn3cr0nx/email-service/internal/provider"
 	"github.com/xn3cr0nx/email-service/pkg/pprof"
 	"github.com/xn3cr0nx/email-service/pkg/tracer"
 	"github.com/xn3cr0nx/email-service/pkg/validator"
@@ -32,7 +32,7 @@ type (
 	Server struct {
 		port   string
 		router *echo.Echo
-		mailer mailer.Service
+		mailer provider.Mailer
 		tracer trace.Tracer
 		meter  metric.Meter
 	}
@@ -45,7 +45,7 @@ const (
 var server *Server
 
 // NewServer singleton pattern that returns pointer to server
-func NewServer(port int, m mailer.Service, tracer trace.Tracer, meter metric.Meter) *Server {
+func NewServer(port int, m provider.Mailer, tracer trace.Tracer, meter metric.Meter) *Server {
 	if server != nil {
 		return server
 	}
